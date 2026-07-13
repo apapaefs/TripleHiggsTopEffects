@@ -16,6 +16,7 @@ from scripts.run_scan import (
     replace_run_settings,
     replace_slha_parameters,
     set_pdf_labels,
+    set_optional_run_setting,
 )
 from scripts.mg5_generate_events import repair_lhapdf_include
 
@@ -126,6 +127,23 @@ class CardTests(unittest.TestCase):
         repeated = set_pdf_labels(updated, "lhapdf")
         self.assertEqual(repeated.count("= pdlabel1"), 1)
         self.assertEqual(repeated.count("= pdlabel2"), 1)
+
+    def test_hidden_run_setting_is_added_or_replaced(self) -> None:
+        updated = set_optional_run_setting(
+            RUN_CARD, "survey_splitting", "3", comment="parallel survey"
+        )
+        self.assertEqual(
+            extract_run_settings(updated, ["survey_splitting"]),
+            {"survey_splitting": "3"},
+        )
+        self.assertEqual(updated.count("= survey_splitting"), 1)
+
+        repeated = set_optional_run_setting(updated, "survey_splitting", "2")
+        self.assertEqual(
+            extract_run_settings(repeated, ["survey_splitting"]),
+            {"survey_splitting": "2"},
+        )
+        self.assertEqual(repeated.count("= survey_splitting"), 1)
 
     def test_missing_parameter_is_rejected(self) -> None:
         with self.assertRaises(CampaignError):

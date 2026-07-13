@@ -210,6 +210,29 @@ def replace_run_settings(text: str, updates: Mapping[str, str]) -> str:
     return "".join(lines)
 
 
+def set_optional_run_setting(
+    text: str, name: str, value: str, *, comment: str = "campaign override"
+) -> str:
+    """Replace a run-card setting, or append it when MadGraph hides the default."""
+    lines = text.splitlines(keepends=True)
+    for index, line in enumerate(lines):
+        body = line.rstrip("\r\n")
+        ending = line[len(body) :]
+        match = RUN_CARD_RE.match(body)
+        if not match or match.group(4).lower() != name.lower():
+            continue
+        lines[index] = (
+            f"{match.group(1)}{value}{match.group(3)}"
+            f"{match.group(4)}{match.group(5)}{ending}"
+        )
+        return "".join(lines)
+
+    if lines and not lines[-1].endswith(("\n", "\r")):
+        lines[-1] += "\n"
+    lines.append(f"  {value} = {name} ! {comment}\n")
+    return "".join(lines)
+
+
 def set_pdf_labels(text: str, value: str) -> str:
     """Set MadGraph's global and per-beam PDF labels.
 
@@ -345,6 +368,7 @@ def validate_completed_run(
     pdlabel: str | None,
     lhaid: int | None,
     dynamical_scale_choice: int | None,
+    survey_splitting: int | None,
     use_systematics: bool | None,
 ) -> tuple[Path, Path]:
     lhe = run_lhe(run_dir)
@@ -366,6 +390,7 @@ def validate_completed_run(
             "pdlabel",
             "lhaid",
             "dynamical_scale_choice",
+            "survey_splitting",
             "use_syst",
         ],
     )
@@ -386,6 +411,12 @@ def validate_completed_run(
     ) != dynamical_scale_choice:
         raise CampaignError(
             f"existing run {run_dir.name} has a different dynamical scale choice"
+        )
+    if survey_splitting is not None and int(
+        settings.get("survey_splitting", "-999")
+    ) != survey_splitting:
+        raise CampaignError(
+            f"existing run {run_dir.name} has a different survey splitting"
         )
     if use_systematics is not None and settings.get("use_syst", "").lower() != str(
         use_systematics
@@ -415,7 +446,15 @@ def banner_summary(banner: Path) -> dict[str, str | int | None]:
     )
     event_count = re.search(r"Number of Events\s*:\s*(\d+)", text)
     settings = extract_run_settings(
-        text, ["iseed", "pdlabel", "lhaid", "dynamical_scale_choice", "use_syst"]
+        text,
+        [
+            "iseed",
+            "pdlabel",
+            "lhaid",
+            "dynamical_scale_choice",
+            "survey_splitting",
+            "use_syst",
+        ],
     )
     use_syst = settings.get("use_syst")
     return {
@@ -429,6 +468,7 @@ def banner_summary(banner: Path) -> dict[str, str | int | None]:
         "pdlabel": settings.get("pdlabel"),
         "lhaid": settings.get("lhaid"),
         "dynamical_scale_choice": settings.get("dynamical_scale_choice"),
+        "survey_splitting": settings.get("survey_splitting"),
         "systematics_enabled": (
             use_syst.lower() == "true" if use_syst is not None else None
         ),
@@ -483,6 +523,7 @@ def plan_payload(
     pdlabel: str | None,
     lhaid: int | None,
     dynamical_scale_choice: int | None,
+    survey_splitting: int | None,
     use_systematics: bool | None,
 ) -> dict[str, object]:
     return {
@@ -494,6 +535,7 @@ def plan_payload(
         "pdlabel": pdlabel,
         "lhaid": lhaid,
         "dynamical_scale_choice": dynamical_scale_choice,
+        "survey_splitting": survey_splitting,
         "systematics_enabled": use_systematics,
         "points": [
             {
@@ -545,6 +587,11 @@ def parse_args() -> argparse.Namespace:
         type=int,
         help="optional run-card dynamical_scale_choice override",
     )
+    parser.add_argument(
+        "--survey-splitting",
+        type=int,
+        help="explicit survey jobs per integration channel (loop-induced runs)",
+    )
     systematics = parser.add_mutually_exclusive_group()
     systematics.add_argument(
         "--systematics",
@@ -578,6 +625,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("--ebeam must be positive")
     if args.seed_start < 0:
         parser.error("--seed-start must be non-negative")
+    if args.survey_splitting is not None and args.survey_splitting <= 0:
+        parser.error("--survey-splitting must be positive")
     if (args.pdlabel is None) != (args.lhaid is None):
         parser.error("--pdlabel and --lhaid must be supplied together")
     return args
@@ -606,6 +655,7 @@ def main() -> int:
         pdlabel=args.pdlabel,
         lhaid=args.lhaid,
         dynamical_scale_choice=args.dynamical_scale_choice,
+        survey_splitting=args.survey_splitting,
         use_systematics=args.use_systematics,
     )
     print(json.dumps(payload, indent=2, sort_keys=True))
@@ -644,6 +694,7 @@ def main() -> int:
                         pdlabel=args.pdlabel,
                         lhaid=args.lhaid,
                         dynamical_scale_choice=args.dynamical_scale_choice,
+                        survey_splitting=args.survey_splitting,
                         use_systematics=args.use_systematics,
                     )
                     destination = copy_and_record(
@@ -683,6 +734,13 @@ def main() -> int:
                 updated_run = replace_run_settings(
                     original_run.decode("utf-8"), run_updates
                 )
+                if args.survey_splitting is not None:
+                    updated_run = set_optional_run_setting(
+                        updated_run,
+                        "survey_splitting",
+                        str(args.survey_splitting),
+                        comment="survey jobs per integration channel",
+                    )
                 if args.pdlabel is not None:
                     updated_run = set_pdf_labels(updated_run, args.pdlabel)
                 atomic_write(param_card, updated_param.encode("utf-8"))

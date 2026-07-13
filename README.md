@@ -228,6 +228,7 @@ The principal command-line settings are:
 | `--seed-start N` | Assign consecutive explicit seeds starting at `N` |
 | `--pdlabel lhapdf --lhaid ID` | Select an installed LHAPDF set |
 | `--dynamical-scale-choice N` | Override the MadGraph scale choice |
+| `--survey-splitting N` | Explicit survey jobs per integration channel; mainly used by the parallel orchestrator |
 | `--systematics` / `--no-systematics` | Enable or disable event-by-event scale and PDF weights |
 | `--mg5-root PATH` | MadGraph installation containing the process |
 | `--process-dir PATH` | Explicit generated-process directory |
@@ -235,10 +236,11 @@ The principal command-line settings are:
 | `--dry-run` | Print the campaign plan without launching MadGraph |
 | `--resume` | Validate and reuse completed, exactly matching runs |
 
-Points remain sequential even when `--cores` is larger than one; the option
-parallelizes MadGraph work within the current point.  Run only one campaign at
-a time against a given generated-process directory.  The process lock prevents
-accidental concurrent use.
+`run_scan.py` keeps points sequential even when `--cores` is larger than one;
+the option parallelizes MadGraph work within the current point.  Run only one
+campaign at a time against a given generated-process directory.  The process
+lock prevents accidental concurrent use.  Use `run_parallel_scan.py`, described
+below, when independent process copies should run concurrently.
 
 The driver preserves the generated process's PDF and scale unless overrides
 are supplied.  `--pdlabel` and `--lhaid` must be given together, and the PDF
@@ -303,9 +305,11 @@ The tracked production grids contain:
 - 16 `ct2` jobs: four `(k3,k4)` points times four `ct2` values, with `CT3=0`;
 - 8 `ct3` jobs: four `(k3,k4)` points times two `ct3` values, with `CT2=0`.
 
-This is 24 production jobs and 2.4 million requested events.  The serial
-launcher uses 100,000 events per point, 6.5 TeV per beam, explicitly constrains
-MadGraph to one core,
+This is 24 production jobs and 2.4 million requested events.  Both production
+launchers use 100,000 events per point and 6.5 TeV per beam.  The serial
+launcher explicitly constrains MadGraph to one core per point.  The parallel
+launcher distributes a machine-wide CPU budget across isolated process copies.
+Both use
 `NNPDF40_lo_as_01180` (LHAPDF ID 331900), and
 MadGraph dynamical-scale choice 3.  The LO PDF is the selected campaign setup;
 the scale choice follows the simulation setup documented in arXiv:2312.13562.
@@ -335,7 +339,86 @@ On a host such as `physres1.kennesaw.edu`, where `lhapdf-config` is already in
 SKIP_MODULE=1 scripts/run_13tev_serial.sh
 ```
 
-The launcher obtains the LHAPDF data, library, and Python paths from
+### Use all CPUs on `physres1`
+
+The generated process has one subprocess and one integration channel.  A
+single ordinary MadGraph run therefore does not fan out efficiently to all 64
+hardware threads.  The parallel launcher makes one copy-on-write process clone
+per scan point and runs the 24 independent points together.  With 64 CPU slots,
+16 points receive three slots and eight receive two, exactly
+`16*3 + 8*2 = 64`.  It also sets MadGraph's loop-induced
+`survey_splitting` to the same per-point allocation, rather than accepting the
+much smaller automatic square-root fan-out.
+
+On `physres1.kennesaw.edu`, run the validated 100,000-event campaign with:
+
+```bash
+cd /home/apapaefs/Projects/TripleHiggsTopEffects
+SKIP_MODULE=1 TOTAL_CORES=64 scripts/run_13tev_parallel.sh
+```
+
+The current machine exposes 64 hardware threads from 32 physical AMD EPYC
+cores.  Here `TOTAL_CORES` means schedulable CPU slots, so 64 uses SMT as well.
+The launcher refuses an allocation larger than its CPU affinity unless
+`ALLOW_OVERSUBSCRIPTION=1` is deliberately supplied.
+
+Worker processes live under `.work/13tev-parallel/processes/`.  On an XFS
+filesystem, GNU `cp --reflink=auto` makes these clones space-efficient; the
+portable fallback is a normal copy.  Each point writes a separate log under
+`logs/13tev-parallel/`, avoiding interleaved MadGraph output.  Completed LHEs
+and the combined manifest are published to `artifacts/lhe/13tev/`.
+
+Inspect the exact 24-point allocation without creating workers or launching
+MadGraph:
+
+```bash
+SKIP_MODULE=1 TOTAL_CORES=64 DRY_RUN=1 scripts/run_13tev_parallel.sh
+```
+
+Create or validate all isolated worker directories without generating events:
+
+```bash
+SKIP_MODULE=1 TOTAL_CORES=64 PREPARE_ONLY=1 scripts/run_13tev_parallel.sh
+```
+
+The parallel launcher assigns explicit, distinct seeds 13001 through 13024 so
+that cloned processes do not inherit correlated automatic seed state.  It is
+restartable: each worker validates and reuses a completed matching run.  If the
+source generated process has intentionally changed, ensure no campaign is
+running and use `REBUILD_WORKERS=1` once to replace only the generated worker
+copies.
+
+Common parallel-launcher overrides are:
+
+| Environment variable | Default | Purpose |
+|---|---:|---|
+| `EVENTS` | `100000` | Events requested per point |
+| `TOTAL_CORES` | online CPU count | Machine-wide CPU-slot budget |
+| `EBEAM` | `6500` | Energy of each proton in GeV |
+| `CT2_POINTS` | `scans/ct2.13tev.csv` | `ct2` point grid |
+| `CT3_POINTS` | `scans/ct3.13tev.csv` | `ct3` point grid |
+| `SEED_START` | `13001` | First of the consecutive explicit point seeds |
+| `OUTPUT_DIR` | `artifacts/lhe/13tev` | Published LHE and manifest directory |
+| `WORK_DIR` | `.work/13tev-parallel` | Isolated process and task state |
+| `LOG_DIR` | `logs/13tev-parallel` | Per-point logs |
+| `MG5_ROOT` | `MG5_aMC_v3_5_16` | MadGraph installation |
+| `PROCESS_DIR` | `$MG5_ROOT/gg_hhh_restricted5` | Source generated process |
+
+For example, a 14 TeV, 20,000-event run on a 32-slot computer is:
+
+```bash
+SKIP_MODULE=1 EVENTS=20000 EBEAM=7000 TOTAL_CORES=32 \
+  OUTPUT_DIR="$PWD/artifacts/lhe/my_14tev_scan" \
+  WORK_DIR="$PWD/.work/my_14tev_scan" \
+  scripts/run_13tev_parallel.sh
+```
+
+Use a distinct `OUTPUT_DIR`, `WORK_DIR`, point name, or all three when changing
+physics settings.  A worker's resume validation includes the couplings, event
+count, beam energy, seed, PDF, dynamical scale, systematics choice, and survey
+splitting.
+
+The launchers obtain the LHAPDF data, library, and Python paths from
 `lhapdf-config`.  Override the production event count with `EVENTS=N`; the
 10-event pilot remains controlled separately by `SMOKE_EVENTS=N`.
 
