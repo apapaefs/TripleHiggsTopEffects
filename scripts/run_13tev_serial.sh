@@ -18,6 +18,13 @@ fi
 
 module load herwig/stable-full-py3-rivet4
 
+mg5_heptools_lib=$mg5_root/HEPTools/lib
+if [[ ! -f "$mg5_heptools_lib/libcollier.so" ]]; then
+  echo "MadGraph Collier library not found in $mg5_heptools_lib." >&2
+  exit 1
+fi
+export LD_LIBRARY_PATH="$mg5_heptools_lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
 if ! command -v lhapdf-config >/dev/null 2>&1; then
   echo "lhapdf-config is unavailable after loading the Herwig module." >&2
   exit 1
