@@ -71,50 +71,208 @@ untracked.
 ## Prepare a process
 
 The existing Tiresias process is already prepared.  On a fresh installation,
-run:
+the repository needs a MadGraph installation and a copy of the restricted UFO.
+Inspect the proposed paths and MadGraph command deck first:
+
+```bash
+python3 scripts/prepare_process.py \
+  --mg5-root /path/to/MG5_aMC_v3_5_16 \
+  --model-source /path/to/heft_loop_sm_restricted5 \
+  --dry-run
+```
+
+Remove `--dry-run` to copy the UFO into MadGraph and generate the process.  Use
+`--process-dir /path/to/process` when the generated process should not live at
+`MG5_aMC_v3_5_16/gg_hhh_restricted5`.  Add `--install-collier` only when the
+MadGraph installation still needs Collier and has network access.  The default
+paths reproduce the Tiresias layout above, so the short form there is:
 
 ```bash
 python3 scripts/prepare_process.py --dry-run
 python3 scripts/prepare_process.py
 ```
 
-Defaults assume the Tiresias layout above.  Use `--mg5-root`, `--model-source`,
-or `--process-dir` for another layout.  Add `--install-collier` only when the
-MadGraph installation still needs Collier and has network access.
+Another computer must provide Python, working C/C++ and Fortran compilers,
+MadGraph's loop dependencies (including Collier), LHAPDF, and the requested PDF
+set.  Activate that machine's module, package-manager, or local installation so
+that `lhapdf-config` and the corresponding shared libraries are available
+before running a scan.  The current setup is tested with MadGraph 3.5.16.
 
-## Define and run scans
+## Define scan points
 
-The CSV files in `scans/` are deliberately small examples, not production
-benchmark choices.  Copy and edit them to define the desired points; scan
-definitions are suitable for version control.
+Scan points are ordinary CSV files and are suitable for version control.  Each
+row defines one MadGraph job, and rows are processed sequentially.  A `ct2`
+file must have exactly the columns `name,k3,k4,ct2`; the driver fixes `CT3=0`:
 
-Always inspect a dry run first:
+```csv
+name,k3,k4,ct2
+point_a,-8,50,-0.3
+point_b,-8,50,0.6
+sm_reference,1,1,0
+```
+
+A `ct3` file uses `name,k3,k4,ct3`; the driver fixes `CT2=0`:
+
+```csv
+name,k3,k4,ct3
+point_a,-8,50,-5
+point_b,-8,50,5
+sm_reference,1,1,0
+```
+
+Point names must be unique within a file, may contain only letters, numbers,
+and underscores, and must not start with an underscore.  They become part of
+the MadGraph run name.  Use new names when changing the couplings, energy,
+event count, PDF, or scale of a previously attempted campaign.
+
+The CSV values are the direct multipliers `k3` and `k4`.  Convert anomalous
+parameters before writing the file: `k3=1+c3` and `k4=1+d4`.  The files
+`scans/ct2.example.csv` and `scans/ct3.example.csv` provide minimal templates.
+
+## Run a custom scan on Tiresias
+
+Load the environment once in the shell that will run MadGraph:
+
+```bash
+cd /mnt/ssd2/Projects/TripleHiggsTopEffects
+
+source /etc/profile.d/modules.sh
+module load herwig/stable-full-py3-rivet4
+
+export LD_LIBRARY_PATH="$PWD/MG5_aMC_v3_5_16/HEPTools/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+```
+
+Then inspect a dry run.  For example, this is a serial 14 TeV `ct2` scan with
+20,000 events per point and NNPDF 4.0 LO:
 
 ```bash
 python3 scripts/run_scan.py \
   --scan ct2 \
-  --points scans/ct2.example.csv \
-  --events 1000 \
-  --cores 8 \
+  --points scans/my_ct2.csv \
+  --events 20000 \
+  --cores 1 \
+  --ebeam 7000 \
+  --ct1 1 \
+  --pdlabel lhapdf \
+  --lhaid 331900 \
+  --dynamical-scale-choice 3 \
+  --mg5-root "$PWD/MG5_aMC_v3_5_16" \
+  --output-dir "$PWD/artifacts/lhe/my_14tev_scan" \
   --dry-run
 ```
 
-Remove `--dry-run` to generate events.  The corresponding `ct3` invocation is:
+`--ebeam` is the energy of each proton, not the total collision energy.  Common
+choices are:
+
+| Proton energy (`--ebeam`) | Proton-proton energy |
+|---:|---:|
+| 6500 GeV | 13 TeV |
+| 6800 GeV | 13.6 TeV |
+| 7000 GeV | 14 TeV |
+| 50000 GeV | 100 TeV |
+
+Remove `--dry-run` to generate events.  To run `ct3`, change both `--scan ct2`
+and the points file:
 
 ```bash
 python3 scripts/run_scan.py \
   --scan ct3 \
-  --points scans/ct3.example.csv \
-  --events 1000 \
-  --cores 8 \
-  --dry-run
+  --points scans/my_ct3.csv \
+  --events 20000 \
+  --cores 1 \
+  --ebeam 7000 \
+  --ct1 1 \
+  --pdlabel lhapdf \
+  --lhaid 331900 \
+  --dynamical-scale-choice 3 \
+  --mg5-root "$PWD/MG5_aMC_v3_5_16" \
+  --output-dir "$PWD/artifacts/lhe/my_14tev_ct3"
 ```
 
-The default beam energy is 6.8 TeV per proton (13.6 TeV collisions), matching
-the process currently on Tiresias.  The driver preserves the process
-directory's PDF and scale choices unless `--pdlabel`, `--lhaid`, and/or
-`--dynamical-scale-choice` are supplied. Review those choices before a
-production campaign.
+Before a full campaign, run a one-row CSV with a distinct name such as
+`smoke_point_a` and a small event count.  Check that it produces a nonempty
+LHE, that the banner records the intended couplings, beam energy, PDF, and
+scale, and that `manifest.jsonl` reports the requested event count.  Keep smoke
+and production names distinct because changing `--events` makes them different
+runs.
+
+The principal command-line settings are:
+
+| Option | Meaning |
+|---|---|
+| `--events N` | Requested events for every CSV row |
+| `--cores N` | MadGraph cores used for the current point |
+| `--ebeam E` | Energy of each proton in GeV |
+| `--ct1 X` | `CT1` value; normally 1 |
+| `--seed-start N` | Assign consecutive explicit seeds starting at `N` |
+| `--pdlabel lhapdf --lhaid ID` | Select an installed LHAPDF set |
+| `--dynamical-scale-choice N` | Override the MadGraph scale choice |
+| `--mg5-root PATH` | MadGraph installation containing the process |
+| `--process-dir PATH` | Explicit generated-process directory |
+| `--output-dir PATH` | Destination for copied LHE files and the manifest |
+| `--dry-run` | Print the campaign plan without launching MadGraph |
+| `--resume` | Validate and reuse completed, exactly matching runs |
+
+Points remain sequential even when `--cores` is larger than one; the option
+parallelizes MadGraph work within the current point.  Run only one campaign at
+a time against a given generated-process directory.  The process lock prevents
+accidental concurrent use.
+
+The driver preserves the generated process's PDF and scale unless overrides
+are supplied.  `--pdlabel` and `--lhaid` must be given together, and the PDF
+must be installed in the active LHAPDF data path.  NNPDF 4.0 LO in the current
+Tiresias setup is `NNPDF40_lo_as_01180`, LHAPDF ID 331900.
+
+Prefer a new point name when changing a setup.  Use `--resume` only for a
+genuinely identical run: it checks the couplings, event count, beam energy,
+seed, PDF, and scale before reusing the LHE.  `--force` deliberately bypasses
+the existing-run protection and should be reserved for controlled recovery.
+
+## Run in `screen`
+
+Long runs should live in a persistent terminal on Tiresias:
+
+```bash
+screen -S hhh_my_scan
+```
+
+Run the environment setup and `run_scan.py` command inside that session.  Type
+`Ctrl-A`, then `D`, to detach.  Reconnect with:
+
+```bash
+screen -r hhh_my_scan
+```
+
+Runs stop at parton level.  MadGraph retains its run under
+`gg_hhh_restricted5/Events/`, while the driver copies the completed LHE to the
+chosen `--output-dir`.  The same directory receives `manifest.jsonl`, including
+the couplings, event count, cross section, PDF and scale settings, checksum,
+and repository revision.
+
+## Run a custom scan on another computer
+
+After preparing a process and activating that computer's LHAPDF/compiler
+environment, use the same driver with explicit paths:
+
+```bash
+python3 scripts/run_scan.py \
+  --scan ct2 \
+  --points scans/my_ct2.csv \
+  --events 10000 \
+  --cores 1 \
+  --ebeam 6500 \
+  --ct1 1 \
+  --pdlabel lhapdf \
+  --lhaid 331900 \
+  --dynamical-scale-choice 3 \
+  --process-dir /path/to/gg_hhh_restricted5 \
+  --output-dir /path/to/output
+```
+
+Replace LHAPDF ID 331900 if that machine uses another installed set.  The
+driver automatically invokes the tracked MadEvent compatibility wrapper; do
+not call the generated `bin/generate_events` executable directly for these
+LHAPDF scans.
 
 ## 13 TeV production campaign
 
