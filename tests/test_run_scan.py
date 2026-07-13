@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import sys
 from decimal import Decimal
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from scripts.run_scan import (
     replace_slha_parameters,
     set_pdf_labels,
 )
+from scripts.mg5_generate_events import repair_lhapdf_include
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -129,8 +131,29 @@ class CardTests(unittest.TestCase):
 
     def test_one_core_is_explicitly_constrained(self) -> None:
         command = generate_events_command(Path("/process/bin/generate_events"), "p1", 1)
+        self.assertEqual(command[:2], [sys.executable, "-O"])
+        self.assertIn("scripts/mg5_generate_events.py", command[2])
+        self.assertEqual(command[3:6], ["--process-dir", "/process", "--"])
         self.assertIn("--multicore", command)
         self.assertIn("--nb_core=1", command)
+
+    def test_lhapdf_include_repair_changes_only_global_label(self) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        path = Path(temporary.name) / "run_card.inc"
+        path.write_text(
+            "      PDLABEL = 'nn23lo1'\n"
+            "      PDSUBLABEL(1) = 'lhapdf'\n"
+            "      LHAID = 331900\n",
+            encoding="utf-8",
+        )
+        repair_lhapdf_include(path)
+        self.assertEqual(
+            path.read_text(encoding="utf-8"),
+            "      PDLABEL = 'lhapdf'\n"
+            "      PDSUBLABEL(1) = 'lhapdf'\n"
+            "      LHAID = 331900\n",
+        )
 
 
 class ProductionGridTests(unittest.TestCase):

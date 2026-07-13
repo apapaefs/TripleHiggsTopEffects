@@ -132,6 +132,10 @@ The launcher loads `herwig/stable-full-py3-rivet4` and then prepends MadGraph's
 own `HEPTools/lib` directory so that MadLoop can resolve its Collier library.
 The driver writes both per-beam PDF labels explicitly, as required by the
 MadGraph 3.5.x run-card validity logic used by this generated process.
+It also runs MadEvent through a compatibility wrapper that repairs a MadLoop
+second-pass bug which otherwise resets only the generated Fortran global PDF
+label to MadGraph's built-in default.  The wrapper changes the transient
+`run_card.inc`; it does not modify the MadGraph installation or model.
 The launcher first generates a separate 10-event pilot and starts production
 only if the pilot succeeds:
 

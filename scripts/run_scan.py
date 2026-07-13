@@ -12,6 +12,7 @@ import re
 import shutil
 import socket
 import subprocess
+import sys
 import tempfile
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -493,8 +494,14 @@ def plan_payload(
 
 
 def generate_events_command(executable: Path, run_name: str, cores: int) -> list[str]:
+    process_dir = executable.parent.parent
     return [
-        str(executable),
+        sys.executable,
+        "-O",
+        str(REPOSITORY_ROOT / "scripts" / "mg5_generate_events.py"),
+        "--process-dir",
+        str(process_dir),
+        "--",
         run_name,
         "-f",
         "--laststep=parton",
