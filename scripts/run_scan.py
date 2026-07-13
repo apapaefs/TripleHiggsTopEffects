@@ -445,6 +445,17 @@ def plan_payload(
     }
 
 
+def generate_events_command(executable: Path, run_name: str, cores: int) -> list[str]:
+    return [
+        str(executable),
+        run_name,
+        "-f",
+        "--laststep=parton",
+        "--multicore",
+        f"--nb_core={cores}",
+    ]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--scan", choices=("ct2", "ct3"), required=True)
@@ -588,14 +599,9 @@ def main() -> int:
                 atomic_write(param_card, updated_param.encode("utf-8"))
                 atomic_write(run_card, updated_run.encode("utf-8"))
 
-                command = [
-                    str(executable),
-                    point.run_name,
-                    "-f",
-                    "--laststep=parton",
-                ]
-                if args.cores > 1:
-                    command.extend(["--multicore", f"--nb_core={args.cores}"])
+                command = generate_events_command(
+                    executable, point.run_name, args.cores
+                )
                 print("Running:", " ".join(command), flush=True)
                 try:
                     subprocess.run(command, cwd=process_dir, check=True)

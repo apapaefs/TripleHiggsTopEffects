@@ -10,6 +10,7 @@ from scripts.run_scan import (
     LHA_CODES,
     extract_run_settings,
     extract_slha_parameters,
+    generate_events_command,
     load_points,
     replace_run_settings,
     replace_slha_parameters,
@@ -104,6 +105,11 @@ class CardTests(unittest.TestCase):
     def test_missing_parameter_is_rejected(self) -> None:
         with self.assertRaises(CampaignError):
             replace_slha_parameters(PARAM_CARD, {999: Decimal("1")})
+
+    def test_one_core_is_explicitly_constrained(self) -> None:
+        command = generate_events_command(Path("/process/bin/generate_events"), "p1", 1)
+        self.assertIn("--multicore", command)
+        self.assertIn("--nb_core=1", command)
 
 
 class ProductionGridTests(unittest.TestCase):

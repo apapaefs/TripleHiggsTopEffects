@@ -124,7 +124,8 @@ The tracked production grids contain:
 - 8 `ct3` jobs: four `(k3,k4)` points times two `ct3` values, with `CT2=0`.
 
 This is 24 production jobs and 240,000 requested events.  The serial launcher
-uses 6.5 TeV per beam, one core, `NNPDF40_lo_as_01180` (LHAPDF ID 331900), and
+uses 6.5 TeV per beam, explicitly constrains MadGraph to one core,
+`NNPDF40_lo_as_01180` (LHAPDF ID 331900), and
 MadGraph dynamical-scale choice 3.  The LO PDF is the selected campaign setup;
 the scale choice follows the simulation setup documented in arXiv:2312.13562.
 The launcher loads `herwig/stable-full-py3-rivet4` and then prepends MadGraph's
