@@ -302,8 +302,9 @@ The tracked production grids contain:
 - 16 `ct2` jobs: four `(k3,k4)` points times four `ct2` values, with `CT3=0`;
 - 8 `ct3` jobs: four `(k3,k4)` points times two `ct3` values, with `CT2=0`.
 
-This is 24 production jobs and 240,000 requested events.  The serial launcher
-uses 6.5 TeV per beam, explicitly constrains MadGraph to one core,
+This is 24 production jobs and 2.4 million requested events.  The serial
+launcher uses 100,000 events per point, 6.5 TeV per beam, explicitly constrains
+MadGraph to one core,
 `NNPDF40_lo_as_01180` (LHAPDF ID 331900), and
 MadGraph dynamical-scale choice 3.  The LO PDF is the selected campaign setup;
 the scale choice follows the simulation setup documented in arXiv:2312.13562.
@@ -321,6 +322,17 @@ only if the pilot succeeds:
 ```bash
 scripts/run_13tev_serial.sh
 ```
+
+On a host such as `physres1.kennesaw.edu`, where `lhapdf-config` is already in
+`PATH` but the Tiresias Herwig module is unavailable, bypass the module load:
+
+```bash
+SKIP_MODULE=1 scripts/run_13tev_serial.sh
+```
+
+The launcher obtains the LHAPDF data, library, and Python paths from
+`lhapdf-config`.  Override the production event count with `EVENTS=N`; the
+10-event pilot remains controlled separately by `SMOKE_EVENTS=N`.
 
 The launcher is restartable: completed runs are verified and reused.  Set
 `SKIP_SMOKE=1` only after a valid pilot already exists.  `DRY_RUN=1` prints and

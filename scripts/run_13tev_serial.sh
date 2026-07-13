@@ -5,31 +5,38 @@ repository_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$repository_root"
 mg5_root=${MG5_ROOT:-$repository_root/MG5_aMC_v3_5_16}
 output_dir=${OUTPUT_DIR:-$repository_root/artifacts/lhe/13tev}
+events=${EVENTS:-100000}
 
-if [[ -r /etc/profile.d/modules.sh ]]; then
-  set +u
-  source /etc/profile.d/modules.sh
-  set -u
-fi
-if ! type module >/dev/null 2>&1; then
-  echo "Environment Modules is required to load LHAPDF." >&2
-  exit 1
-fi
+if [[ "${SKIP_MODULE:-0}" != 1 ]]; then
+  if [[ -r /etc/profile.d/modules.sh ]]; then
+    set +u
+    source /etc/profile.d/modules.sh
+    set -u
+  fi
+  if ! type module >/dev/null 2>&1; then
+    echo "Environment Modules is unavailable; set SKIP_MODULE=1 when LHAPDF is already configured." >&2
+    exit 1
+  fi
 
-module load herwig/stable-full-py3-rivet4
+  module load "${HERWIG_MODULE:-herwig/stable-full-py3-rivet4}"
+fi
 
 mg5_heptools_lib=$mg5_root/HEPTools/lib
 if [[ ! -f "$mg5_heptools_lib/libcollier.so" ]]; then
   echo "MadGraph Collier library not found in $mg5_heptools_lib." >&2
   exit 1
 fi
-export LD_LIBRARY_PATH="$mg5_heptools_lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 if ! command -v lhapdf-config >/dev/null 2>&1; then
-  echo "lhapdf-config is unavailable after loading the Herwig module." >&2
+  echo "lhapdf-config is unavailable in PATH." >&2
   exit 1
 fi
 pdf_data=$(lhapdf-config --datadir)
+lhapdf_lib=$(lhapdf-config --libdir)
+lhapdf_python=$(lhapdf-config --pythonpath)
+export LHAPDF_DATA_PATH="$pdf_data${LHAPDF_DATA_PATH:+:$LHAPDF_DATA_PATH}"
+export LD_LIBRARY_PATH="$mg5_heptools_lib:$lhapdf_lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PYTHONPATH="$lhapdf_python${PYTHONPATH:+:$PYTHONPATH}"
 if [[ ! -d "$pdf_data/NNPDF40_lo_as_01180" ]]; then
   echo "NNPDF40_lo_as_01180 is not installed in $pdf_data." >&2
   exit 1
@@ -41,7 +48,7 @@ if [[ "${DRY_RUN:-0}" == 1 ]]; then
 fi
 
 common_arguments=(
-  --events 10000
+  --events "$events"
   --cores 1
   --ebeam 6500
   --ct1 1
