@@ -20,13 +20,19 @@ The restricted UFO uses the following names in `BLOCK BSMINPUTS`:
 | `ct1` | `CT1` | 993 |
 | `ct2` | `CT2` | 994 |
 | `ct3` | `CT3` | 995 |
-| `c3` | `D3` | 996 |
-| `d4` | `D4` | 997 |
+| `k3 = 1 + c3` | `D3` | 996 |
+| `k4 = 1 + d4` | `D4` | 997 |
 
 The campaign driver supports two families:
 
-- `ct2`: vary `(c3, d4, ct2)`, fix `CT1=1` and `CT3=0`;
-- `ct3`: vary `(c3, d4, ct3)`, fix `CT1=1` and `CT2=0`.
+- `ct2`: vary `(k3, k4, ct2)`, fix `CT1=1` and `CT3=0`;
+- `ct3`: vary `(k3, k4, ct3)`, fix `CT1=1` and `CT2=0`.
+
+The UFO's `D3` and `D4` parameters multiply the SM triple- and quartic-Higgs
+vertices directly, so CSV inputs are `k3` and `k4`, not the shifted anomalous
+coefficients.  For example, `(k3, k4) = (-8, 50)` is written as
+`D3=-8, D4=50`.  This agrees with the convention in
+[arXiv:2312.13562](https://arxiv.org/abs/2312.13562).
 
 `--ct1` can override the `CT1=1` convention explicitly.  Every run writes all
 five couplings into the parameter card, so it never inherits the UFO's
@@ -106,8 +112,31 @@ python3 scripts/run_scan.py \
 
 The default beam energy is 6.8 TeV per proton (13.6 TeV collisions), matching
 the process currently on Tiresias.  The driver preserves the process
-directory's PDF and scale choices unless `--pdlabel` and `--lhaid` are supplied.
-Review those choices before a production campaign.
+directory's PDF and scale choices unless `--pdlabel`, `--lhaid`, and/or
+`--dynamical-scale-choice` are supplied. Review those choices before a
+production campaign.
+
+## 13 TeV production campaign
+
+The tracked production grids contain:
+
+- 16 `ct2` jobs: four `(k3,k4)` points times four `ct2` values, with `CT3=0`;
+- 8 `ct3` jobs: four `(k3,k4)` points times two `ct3` values, with `CT2=0`.
+
+This is 24 production jobs and 240,000 requested events.  The serial launcher
+uses 6.5 TeV per beam, one core, `NNPDF40_lo_as_01180` (LHAPDF ID 331900), and
+MadGraph dynamical-scale choice 3.  The LO PDF is the selected campaign setup;
+the scale choice follows the simulation setup documented in arXiv:2312.13562.
+The launcher first generates a separate 10-event pilot and starts production
+only if the pilot succeeds:
+
+```bash
+scripts/run_13tev_serial.sh
+```
+
+The launcher is restartable: completed runs are verified and reused.  Set
+`SKIP_SMOKE=1` only after a valid pilot already exists.  `DRY_RUN=1` prints and
+validates the complete campaign plan without starting MadGraph.
 
 Runs stop at parton level.  Each successful LHE is copied to `artifacts/lhe/`
 and recorded in `artifacts/lhe/manifest.jsonl` with its couplings, checksum,

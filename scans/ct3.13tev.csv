@@ -1,0 +1,10 @@
+# 13 TeV production grid: CT1=1 and CT2=0 are enforced by the driver.
+name,k3,k4,ct3
+k3_m8_k4_p50_ct3_m5,-8,50,-5.0
+k3_m8_k4_p50_ct3_p5,-8,50,5.0
+k3_p6_k4_p50_ct3_m5,6,50,-5.0
+k3_p6_k4_p50_ct3_p5,6,50,5.0
+k3_m5_k4_m50_ct3_m5,-5,-50,-5.0
+k3_m5_k4_m50_ct3_p5,-5,-50,5.0
+k3_p3_k4_m50_ct3_m5,3,-50,-5.0
+k3_p3_k4_m50_ct3_p5,3,-50,5.0

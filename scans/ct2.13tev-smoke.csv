@@ -1,0 +1,3 @@
+# Low-statistics pilot for the 13 TeV production setup.
+name,k3,k4,ct2
+smoke_k3_m8_k4_p50_ct2_m0p3,-8,50,-0.3

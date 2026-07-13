@@ -23,7 +23,7 @@ from typing import Iterator, Mapping, Sequence
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MG5_ROOT = REPOSITORY_ROOT / "MG5_aMC_v3_5_16"
-LHA_CODES = {"ct1": 993, "ct2": 994, "ct3": 995, "c3": 996, "d4": 997}
+LHA_CODES = {"ct1": 993, "ct2": 994, "ct3": 995, "k3": 996, "k4": 997}
 RUN_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_]*$")
 BLOCK_RE = re.compile(r"^\s*BLOCK\s+(\S+)", re.IGNORECASE)
 SLHA_ENTRY_RE = re.compile(r"^(\s*)(\d+)(\s+)([^\s#]+)(.*)$")
@@ -38,8 +38,8 @@ class CampaignError(RuntimeError):
 class ScanPoint:
     name: str
     scan: str
-    c3: Decimal
-    d4: Decimal
+    k3: Decimal
+    k4: Decimal
     active_contact: Decimal
 
     def couplings(self, ct1: Decimal) -> dict[str, Decimal]:
@@ -47,8 +47,8 @@ class ScanPoint:
             "ct1": ct1,
             "ct2": self.active_contact if self.scan == "ct2" else Decimal(0),
             "ct3": self.active_contact if self.scan == "ct3" else Decimal(0),
-            "c3": self.c3,
-            "d4": self.d4,
+            "k3": self.k3,
+            "k4": self.k4,
         }
 
     @property
@@ -78,7 +78,7 @@ def parse_decimal(value: str, *, field: str, line: int) -> Decimal:
 
 def load_points(path: Path, scan: str) -> list[ScanPoint]:
     active = scan
-    expected = ["name", "c3", "d4", active]
+    expected = ["name", "k3", "k4", active]
     try:
         handle = path.open(encoding="utf-8", newline="")
     except OSError as exc:
@@ -110,8 +110,8 @@ def load_points(path: Path, scan: str) -> list[ScanPoint]:
                 ScanPoint(
                     name=name,
                     scan=scan,
-                    c3=parse_decimal(row["c3"], field="c3", line=line_number),
-                    d4=parse_decimal(row["d4"], field="d4", line=line_number),
+                    k3=parse_decimal(row["k3"], field="k3", line=line_number),
+                    k4=parse_decimal(row["k4"], field="k4", line=line_number),
                     active_contact=parse_decimal(
                         row[active], field=active, line=line_number
                     ),
@@ -294,6 +294,9 @@ def validate_completed_run(
     events: int,
     ebeam: Decimal,
     seed: int,
+    pdlabel: str | None,
+    lhaid: int | None,
+    dynamical_scale_choice: int | None,
 ) -> tuple[Path, Path]:
     lhe = run_lhe(run_dir)
     banner = latest_banner(run_dir)
@@ -304,7 +307,18 @@ def validate_completed_run(
         raise CampaignError(
             f"existing run {run_dir.name} has different couplings: {actual}"
         )
-    settings = extract_run_settings(text, ["nevents", "ebeam1", "ebeam2", "iseed"])
+    settings = extract_run_settings(
+        text,
+        [
+            "nevents",
+            "ebeam1",
+            "ebeam2",
+            "iseed",
+            "pdlabel",
+            "lhaid",
+            "dynamical_scale_choice",
+        ],
+    )
     if int(settings.get("nevents", "-1")) != events:
         raise CampaignError(f"existing run {run_dir.name} has a different nevents")
     if Decimal(settings.get("ebeam1", "NaN")) != ebeam or Decimal(
@@ -313,6 +327,16 @@ def validate_completed_run(
         raise CampaignError(f"existing run {run_dir.name} has a different beam energy")
     if seed and int(settings.get("iseed", "-1")) != seed:
         raise CampaignError(f"existing run {run_dir.name} has a different random seed")
+    if pdlabel is not None and settings.get("pdlabel") != pdlabel:
+        raise CampaignError(f"existing run {run_dir.name} has a different pdlabel")
+    if lhaid is not None and int(settings.get("lhaid", "-1")) != lhaid:
+        raise CampaignError(f"existing run {run_dir.name} has a different lhaid")
+    if dynamical_scale_choice is not None and int(
+        settings.get("dynamical_scale_choice", "-999")
+    ) != dynamical_scale_choice:
+        raise CampaignError(
+            f"existing run {run_dir.name} has a different dynamical scale choice"
+        )
     return lhe, banner
 
 
@@ -334,7 +358,9 @@ def banner_summary(banner: Path) -> dict[str, str | int | None]:
         r"Integrated weight \(pb\)\s*:\s*([-+0-9.eEdD]+)", text
     )
     event_count = re.search(r"Number of Events\s*:\s*(\d+)", text)
-    settings = extract_run_settings(text, ["iseed", "pdlabel", "lhaid"])
+    settings = extract_run_settings(
+        text, ["iseed", "pdlabel", "lhaid", "dynamical_scale_choice"]
+    )
     return {
         "cross_section_pb": (
             cross_section.group(1).replace("D", "E").replace("d", "e")
@@ -345,6 +371,7 @@ def banner_summary(banner: Path) -> dict[str, str | int | None]:
         "seed": int(settings["iseed"]) if "iseed" in settings else None,
         "pdlabel": settings.get("pdlabel"),
         "lhaid": settings.get("lhaid"),
+        "dynamical_scale_choice": settings.get("dynamical_scale_choice"),
     }
 
 
@@ -393,6 +420,9 @@ def plan_payload(
     cores: int,
     process_dir: Path,
     output_dir: Path,
+    pdlabel: str | None,
+    lhaid: int | None,
+    dynamical_scale_choice: int | None,
 ) -> dict[str, object]:
     return {
         "process_dir": str(process_dir),
@@ -400,6 +430,9 @@ def plan_payload(
         "events_per_point": events,
         "beam_energy_per_proton_gev": str(ebeam),
         "cores": cores,
+        "pdlabel": pdlabel,
+        "lhaid": lhaid,
+        "dynamical_scale_choice": dynamical_scale_choice,
         "points": [
             {
                 "run_name": point.run_name,
@@ -428,6 +461,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--pdlabel", help="optional run-card pdlabel override")
     parser.add_argument("--lhaid", type=int, help="optional run-card lhaid override")
+    parser.add_argument(
+        "--dynamical-scale-choice",
+        type=int,
+        help="optional run-card dynamical_scale_choice override",
+    )
     parser.add_argument("--mg5-root", type=Path, default=DEFAULT_MG5_ROOT)
     parser.add_argument("--process-dir", type=Path)
     parser.add_argument(
@@ -471,6 +509,9 @@ def main() -> int:
         cores=args.cores,
         process_dir=process_dir,
         output_dir=output_dir,
+        pdlabel=args.pdlabel,
+        lhaid=args.lhaid,
+        dynamical_scale_choice=args.dynamical_scale_choice,
     )
     print(json.dumps(payload, indent=2, sort_keys=True))
     if args.dry_run:
@@ -505,6 +546,9 @@ def main() -> int:
                         events=args.events,
                         ebeam=args.ebeam,
                         seed=seed,
+                        pdlabel=args.pdlabel,
+                        lhaid=args.lhaid,
+                        dynamical_scale_choice=args.dynamical_scale_choice,
                     )
                     destination = copy_and_record(
                         lhe=lhe,
@@ -534,6 +578,10 @@ def main() -> int:
                 if args.pdlabel is not None:
                     run_updates["pdlabel"] = args.pdlabel
                     run_updates["lhaid"] = str(args.lhaid)
+                if args.dynamical_scale_choice is not None:
+                    run_updates["dynamical_scale_choice"] = str(
+                        args.dynamical_scale_choice
+                    )
                 updated_run = replace_run_settings(
                     original_run.decode("utf-8"), run_updates
                 )
