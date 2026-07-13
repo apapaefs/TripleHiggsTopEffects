@@ -12,9 +12,7 @@ from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MG5_ROOT = REPOSITORY_ROOT / "MG5_aMC_v3_5_16"
-DEFAULT_MODEL_SOURCE = (
-    REPOSITORY_ROOT / "multihiggs_loop_sm" / "heft_loop_sm_restricted5"
-)
+DEFAULT_MODEL_SOURCE = REPOSITORY_ROOT / "models" / "heft_loop_sm_restricted5"
 
 
 def parse_args() -> argparse.Namespace:

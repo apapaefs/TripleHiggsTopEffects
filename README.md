@@ -7,9 +7,10 @@ generating parton-level LHE samples for
 g g > h h h
 ```
 
-with MadGraph5_aMC@NLO and the `heft_loop_sm_restricted5` UFO model.  It is
-deliberately separate from MadGraph itself, the UFO source checkout, generated
-process directories, and event files.
+with MadGraph5_aMC@NLO and the `heft_loop_sm_restricted5` UFO model.  The exact
+restricted UFO used by the campaign is vendored under
+`models/heft_loop_sm_restricted5/`.  MadGraph itself, generated process
+directories, and event files remain deliberately separate from the repository.
 
 ## Physics conventions
 
@@ -46,6 +47,24 @@ g g > h h h [noborn=QCD MHEFT] MHEFT^2<=6
 
 as recommended for the restricted model.
 
+## Vendored loop model
+
+The repository contains a ready-to-copy snapshot of
+`heft_loop_sm_restricted5` in `models/heft_loop_sm_restricted5/`.  It was
+exported from `git@gitlab.com:apapaefs/multihiggs_loop_sm.git` at commit
+`99ba5ee9066943a727f063099053604ea2e2f102`.  See `models/README.md` for its
+provenance and citation.
+
+`scripts/prepare_process.py` uses this vendored directory by default and copies
+it to `MG5_aMC_v3_5_16/models/heft_loop_sm_restricted5` when preparing a fresh
+MadGraph process.  The separate `multihiggs_loop_sm/` checkout on Tiresias is
+therefore no longer required for future process preparation.  To install only
+the model manually, run:
+
+```bash
+cp -a models/heft_loop_sm_restricted5 /path/to/MG5_aMC_v3_5_16/models/
+```
+
 ## Tiresias layout
 
 The working tree is expected at
@@ -71,18 +90,20 @@ untracked.
 ## Prepare a process
 
 The existing Tiresias process is already prepared.  On a fresh installation,
-the repository needs a MadGraph installation and a copy of the restricted UFO.
-Inspect the proposed paths and MadGraph command deck first:
+the repository supplies the restricted UFO, so only a suitable MadGraph
+installation is needed.  Inspect the proposed paths and MadGraph command deck
+first:
 
 ```bash
 python3 scripts/prepare_process.py \
   --mg5-root /path/to/MG5_aMC_v3_5_16 \
-  --model-source /path/to/heft_loop_sm_restricted5 \
   --dry-run
 ```
 
-Remove `--dry-run` to copy the UFO into MadGraph and generate the process.  Use
-`--process-dir /path/to/process` when the generated process should not live at
+Remove `--dry-run` to copy the vendored UFO into MadGraph and generate the
+process.  Use `--model-source /path/to/another/UFO` only to override the
+tracked snapshot deliberately.  Use `--process-dir /path/to/process` when the
+generated process should not live at
 `MG5_aMC_v3_5_16/gg_hhh_restricted5`.  Add `--install-collier` only when the
 MadGraph installation still needs Collier and has network access.  The default
 paths reproduce the Tiresias layout above, so the short form there is:
