@@ -1,0 +1,4 @@
+# Illustrative points only; replace these with the intended benchmark grid.
+name,c3,d4,ct2
+sm,1.0,1.0,0.0
+ct2_plus_1,1.0,1.0,1.0

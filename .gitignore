@@ -1,0 +1,29 @@
+# Pre-existing Tiresias runtime installations and source checkouts.
+/MG5_aMC_v*/
+/MG5_aMC_v*.tar.gz
+/multihiggs_loop_sm/
+
+# Generated campaign state and event products.
+/.work/
+/artifacts/
+/logs/
+*.lhe
+*.lhe.gz
+*.hepmc
+*.hepmc.gz
+*.root
+*.yoda
+*.yoda.gz
+
+# Python caches and test state.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+
+# Editor and filesystem metadata.
+.DS_Store
+._*
+**/._*
+*.swp
+*~
