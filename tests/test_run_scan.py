@@ -40,6 +40,7 @@ RUN_CARD = """  1000 = nevents ! requested events
   nn23lo1 = pdlabel ! PDF
   230000 = lhaid ! PDF ID
   -1 = dynamical_scale_choice ! scale
+  True = use_syst ! systematics
 """
 
 
@@ -101,6 +102,7 @@ class CardTests(unittest.TestCase):
             "pdlabel": "lhapdf",
             "lhaid": "260000",
             "dynamical_scale_choice": "3",
+            "use_syst": "False",
         }
         updated = replace_run_settings(RUN_CARD, updates)
         self.assertEqual(extract_run_settings(updated, list(updates)), updates)

@@ -228,6 +228,7 @@ The principal command-line settings are:
 | `--seed-start N` | Assign consecutive explicit seeds starting at `N` |
 | `--pdlabel lhapdf --lhaid ID` | Select an installed LHAPDF set |
 | `--dynamical-scale-choice N` | Override the MadGraph scale choice |
+| `--systematics` / `--no-systematics` | Enable or disable event-by-event scale and PDF weights |
 | `--mg5-root PATH` | MadGraph installation containing the process |
 | `--process-dir PATH` | Explicit generated-process directory |
 | `--output-dir PATH` | Destination for copied LHE files and the manifest |
@@ -308,6 +309,10 @@ MadGraph to one core,
 `NNPDF40_lo_as_01180` (LHAPDF ID 331900), and
 MadGraph dynamical-scale choice 3.  The LO PDF is the selected campaign setup;
 the scale choice follows the simulation setup documented in arXiv:2312.13562.
+The production launcher disables MadGraph's automatic event-by-event
+systematics weights, so the LHE files contain the requested central samples
+without an additional PDF/scale weight ensemble.  Custom scans preserve the
+process default unless `--systematics` or `--no-systematics` is supplied.
 The launcher loads `herwig/stable-full-py3-rivet4` and then prepends MadGraph's
 own `HEPTools/lib` directory so that MadLoop can resolve its Collier library.
 The driver writes both per-beam PDF labels explicitly, as required by the

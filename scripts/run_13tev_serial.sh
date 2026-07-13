@@ -55,6 +55,7 @@ common_arguments=(
   --pdlabel lhapdf
   --lhaid 331900
   --dynamical-scale-choice 3
+  --no-systematics
   --mg5-root "$mg5_root"
   --output-dir "$output_dir"
   --resume
@@ -72,6 +73,7 @@ if [[ "${SKIP_SMOKE:-0}" != 1 ]]; then
     --pdlabel lhapdf \
     --lhaid 331900 \
     --dynamical-scale-choice 3 \
+    --no-systematics \
     --mg5-root "$mg5_root" \
     --output-dir "$output_dir" \
     --resume \

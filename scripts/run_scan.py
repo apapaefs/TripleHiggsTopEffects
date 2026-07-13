@@ -345,6 +345,7 @@ def validate_completed_run(
     pdlabel: str | None,
     lhaid: int | None,
     dynamical_scale_choice: int | None,
+    use_systematics: bool | None,
 ) -> tuple[Path, Path]:
     lhe = run_lhe(run_dir)
     banner = latest_banner(run_dir)
@@ -365,6 +366,7 @@ def validate_completed_run(
             "pdlabel",
             "lhaid",
             "dynamical_scale_choice",
+            "use_syst",
         ],
     )
     if int(settings.get("nevents", "-1")) != events:
@@ -384,6 +386,12 @@ def validate_completed_run(
     ) != dynamical_scale_choice:
         raise CampaignError(
             f"existing run {run_dir.name} has a different dynamical scale choice"
+        )
+    if use_systematics is not None and settings.get("use_syst", "").lower() != str(
+        use_systematics
+    ).lower():
+        raise CampaignError(
+            f"existing run {run_dir.name} has a different systematics setting"
         )
     return lhe, banner
 
@@ -407,8 +415,9 @@ def banner_summary(banner: Path) -> dict[str, str | int | None]:
     )
     event_count = re.search(r"Number of Events\s*:\s*(\d+)", text)
     settings = extract_run_settings(
-        text, ["iseed", "pdlabel", "lhaid", "dynamical_scale_choice"]
+        text, ["iseed", "pdlabel", "lhaid", "dynamical_scale_choice", "use_syst"]
     )
+    use_syst = settings.get("use_syst")
     return {
         "cross_section_pb": (
             cross_section.group(1).replace("D", "E").replace("d", "e")
@@ -420,6 +429,9 @@ def banner_summary(banner: Path) -> dict[str, str | int | None]:
         "pdlabel": settings.get("pdlabel"),
         "lhaid": settings.get("lhaid"),
         "dynamical_scale_choice": settings.get("dynamical_scale_choice"),
+        "systematics_enabled": (
+            use_syst.lower() == "true" if use_syst is not None else None
+        ),
     }
 
 
@@ -471,6 +483,7 @@ def plan_payload(
     pdlabel: str | None,
     lhaid: int | None,
     dynamical_scale_choice: int | None,
+    use_systematics: bool | None,
 ) -> dict[str, object]:
     return {
         "process_dir": str(process_dir),
@@ -481,6 +494,7 @@ def plan_payload(
         "pdlabel": pdlabel,
         "lhaid": lhaid,
         "dynamical_scale_choice": dynamical_scale_choice,
+        "systematics_enabled": use_systematics,
         "points": [
             {
                 "run_name": point.run_name,
@@ -531,6 +545,21 @@ def parse_args() -> argparse.Namespace:
         type=int,
         help="optional run-card dynamical_scale_choice override",
     )
+    systematics = parser.add_mutually_exclusive_group()
+    systematics.add_argument(
+        "--systematics",
+        dest="use_systematics",
+        action="store_const",
+        const=True,
+        help="enable MadGraph event-by-event scale and PDF weights",
+    )
+    systematics.add_argument(
+        "--no-systematics",
+        dest="use_systematics",
+        action="store_const",
+        const=False,
+        help="disable MadGraph event-by-event scale and PDF weights",
+    )
     parser.add_argument("--mg5-root", type=Path, default=DEFAULT_MG5_ROOT)
     parser.add_argument("--process-dir", type=Path)
     parser.add_argument(
@@ -577,6 +606,7 @@ def main() -> int:
         pdlabel=args.pdlabel,
         lhaid=args.lhaid,
         dynamical_scale_choice=args.dynamical_scale_choice,
+        use_systematics=args.use_systematics,
     )
     print(json.dumps(payload, indent=2, sort_keys=True))
     if args.dry_run:
@@ -614,6 +644,7 @@ def main() -> int:
                         pdlabel=args.pdlabel,
                         lhaid=args.lhaid,
                         dynamical_scale_choice=args.dynamical_scale_choice,
+                        use_systematics=args.use_systematics,
                     )
                     destination = copy_and_record(
                         lhe=lhe,
@@ -647,6 +678,8 @@ def main() -> int:
                     run_updates["dynamical_scale_choice"] = str(
                         args.dynamical_scale_choice
                     )
+                if args.use_systematics is not None:
+                    run_updates["use_syst"] = str(args.use_systematics)
                 updated_run = replace_run_settings(
                     original_run.decode("utf-8"), run_updates
                 )
