@@ -130,6 +130,8 @@ MadGraph dynamical-scale choice 3.  The LO PDF is the selected campaign setup;
 the scale choice follows the simulation setup documented in arXiv:2312.13562.
 The launcher loads `herwig/stable-full-py3-rivet4` and then prepends MadGraph's
 own `HEPTools/lib` directory so that MadLoop can resolve its Collier library.
+The driver writes both per-beam PDF labels explicitly, as required by the
+MadGraph 3.5.x run-card validity logic used by this generated process.
 The launcher first generates a separate 10-event pilot and starts production
 only if the pilot succeeds:
 

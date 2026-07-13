@@ -14,6 +14,7 @@ from scripts.run_scan import (
     load_points,
     replace_run_settings,
     replace_slha_parameters,
+    set_pdf_labels,
 )
 
 
@@ -101,6 +102,26 @@ class CardTests(unittest.TestCase):
         }
         updated = replace_run_settings(RUN_CARD, updates)
         self.assertEqual(extract_run_settings(updated, list(updates)), updates)
+
+    def test_pdf_labels_are_set_for_global_and_both_beams(self) -> None:
+        updated = set_pdf_labels(RUN_CARD, "lhapdf")
+        self.assertEqual(
+            extract_run_settings(
+                updated, ["pdlabel", "pdlabel1", "pdlabel2", "lhaid"]
+            ),
+            {
+                "pdlabel": "lhapdf",
+                "pdlabel1": "lhapdf",
+                "pdlabel2": "lhapdf",
+                "lhaid": "230000",
+            },
+        )
+        self.assertEqual(updated.count("= pdlabel1"), 1)
+        self.assertEqual(updated.count("= pdlabel2"), 1)
+
+        repeated = set_pdf_labels(updated, "lhapdf")
+        self.assertEqual(repeated.count("= pdlabel1"), 1)
+        self.assertEqual(repeated.count("= pdlabel2"), 1)
 
     def test_missing_parameter_is_rejected(self) -> None:
         with self.assertRaises(CampaignError):

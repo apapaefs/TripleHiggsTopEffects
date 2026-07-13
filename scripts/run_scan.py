@@ -209,6 +209,53 @@ def replace_run_settings(text: str, updates: Mapping[str, str]) -> str:
     return "".join(lines)
 
 
+def set_pdf_labels(text: str, value: str) -> str:
+    """Set MadGraph's global and per-beam PDF labels.
+
+    MadGraph 3.5.x can retain the hidden global ``pdlabel`` default when only
+    the visible global setting is present.  Explicit per-beam labels make the
+    run-card validity pass promote the global label correctly for ``pdfwrap``.
+    """
+    lines = text.splitlines(keepends=True)
+    names = {"pdlabel", "pdlabel1", "pdlabel2"}
+    found: set[str] = set()
+    global_index: int | None = None
+    global_indent = ""
+    global_ending = "\n"
+
+    for index, line in enumerate(lines):
+        body = line.rstrip("\r\n")
+        ending = line[len(body) :]
+        match = RUN_CARD_RE.match(body)
+        if not match:
+            continue
+        name = match.group(4).lower()
+        if name not in names:
+            continue
+        lines[index] = (
+            f"{match.group(1)}{value}{match.group(3)}"
+            f"{match.group(4)}{match.group(5)}{ending}"
+        )
+        found.add(name)
+        if name == "pdlabel":
+            global_index = index
+            global_indent = match.group(1)
+            global_ending = ending or "\n"
+
+    if global_index is None:
+        raise CampaignError("run_card.dat is missing setting pdlabel")
+
+    beam_by_label = {"pdlabel1": "1", "pdlabel2": "2"}
+    missing = [name for name in beam_by_label if name not in found]
+    additions = [
+        f"{global_indent}{value} = {name} ! PDF type for beam "
+        f"{beam_by_label[name]}{global_ending}"
+        for name in missing
+    ]
+    lines[global_index + 1 : global_index + 1] = additions
+    return "".join(lines)
+
+
 def extract_run_settings(text: str, names: Sequence[str]) -> dict[str, str]:
     wanted = {name.lower() for name in names}
     found: dict[str, str] = {}
@@ -596,6 +643,8 @@ def main() -> int:
                 updated_run = replace_run_settings(
                     original_run.decode("utf-8"), run_updates
                 )
+                if args.pdlabel is not None:
+                    updated_run = set_pdf_labels(updated_run, args.pdlabel)
                 atomic_write(param_card, updated_param.encode("utf-8"))
                 atomic_write(run_card, updated_run.encode("utf-8"))
 
