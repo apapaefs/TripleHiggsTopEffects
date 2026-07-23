@@ -1,0 +1,22 @@
+# Additional 13 TeV grid. CT1=0 and CT3=0 are enforced by the driver.
+# The ct2=0 rows are the single zero-contact reference for each (k3,k4) point.
+name,k3,k4,ct2
+k3_m8_k4_p50_ct2_m0p1,-8,50,-0.1
+k3_m8_k4_p50_ct2_p0p1,-8,50,0.1
+k3_m8_k4_p50_reference,-8,50,0
+k3_p6_k4_p50_ct2_m0p1,6,50,-0.1
+k3_p6_k4_p50_ct2_p0p1,6,50,0.1
+k3_p6_k4_p50_reference,6,50,0
+k3_m5_k4_m50_ct2_m0p1,-5,-50,-0.1
+k3_m5_k4_m50_ct2_p0p1,-5,-50,0.1
+k3_m5_k4_m50_reference,-5,-50,0
+k3_p3_k4_m50_ct2_m0p1,3,-50,-0.1
+k3_p3_k4_m50_ct2_p0p1,3,-50,0.1
+k3_p3_k4_m50_reference,3,-50,0
+k3_p1_k4_p1_ct2_m4,1,1,-4.0
+k3_p1_k4_p1_ct2_m0p3,1,1,-0.3
+k3_p1_k4_p1_ct2_m0p1,1,1,-0.1
+k3_p1_k4_p1_reference,1,1,0
+k3_p1_k4_p1_ct2_p0p1,1,1,0.1
+k3_p1_k4_p1_ct2_p0p6,1,1,0.6
+k3_p1_k4_p1_ct2_p4,1,1,4.0

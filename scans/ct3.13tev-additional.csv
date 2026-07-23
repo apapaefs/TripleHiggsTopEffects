@@ -1,0 +1,15 @@
+# Additional 13 TeV grid. CT1=0 and CT2=0 are enforced by the driver.
+# Zero-contact references are stored only in ct2.13tev-additional.csv.
+name,k3,k4,ct3
+k3_m8_k4_p50_ct3_m0p5,-8,50,-0.5
+k3_m8_k4_p50_ct3_p0p5,-8,50,0.5
+k3_p6_k4_p50_ct3_m0p5,6,50,-0.5
+k3_p6_k4_p50_ct3_p0p5,6,50,0.5
+k3_m5_k4_m50_ct3_m0p5,-5,-50,-0.5
+k3_m5_k4_m50_ct3_p0p5,-5,-50,0.5
+k3_p3_k4_m50_ct3_m0p5,3,-50,-0.5
+k3_p3_k4_m50_ct3_p0p5,3,-50,0.5
+k3_p1_k4_p1_ct3_m5,1,1,-5.0
+k3_p1_k4_p1_ct3_m0p5,1,1,-0.5
+k3_p1_k4_p1_ct3_p0p5,1,1,0.5
+k3_p1_k4_p1_ct3_p5,1,1,5.0
