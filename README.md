@@ -559,12 +559,16 @@ python3 scripts/plot_ct3_shapes.py \
   --expected-beam-energy-gev 7000 \
   --m3h-range 400 1200 \
   --sum-pt-range 0 1200 \
+  --separate-panels \
   --output artifacts/figures/14tev-ct3-mu65-benchmarks \
   --collider-label HL-LHC
 ```
 
-The fixed 40 GeV bins and displayed ranges match Figures 7 and 8.  The
-validation JSON records the fraction of each total distribution outside those
+This writes standalone `-m3h` and `-sum-pth` PDF/PNG panels, plus separate
+unnormalized panels carrying the `-unnormalized` suffix.  Their dimensions,
+internal legends, typography, ticks, and line styling follow Figures 7 and 8.
+The fixed 40 GeV bins and displayed ranges also match those figures.  The
+validation JSON records the fraction of each total distribution outside the
 ranges, histogram closure, and the total-variation shape distance from the SM
 inside each displayed range.  Omitting the two range options restores the
 weighted-99.5th-percentile adaptive range.

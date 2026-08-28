@@ -1,5 +1,6 @@
 {
   "checks_passed": true,
+  "separate_panels": true,
   "common_settings": {
     "pdlabel": "lhapdf",
     "lhaid": 93100,

@@ -128,6 +128,15 @@ class LheShapeTests(unittest.TestCase):
             sample_label(Decimal("0.18"), Decimal("0.8"), Decimal("1.2")),
             r"$\kappa_3=0.8,\quad \kappa_4=1.2,\quad \kappa_{3t}=0.18$",
         )
+        self.assertEqual(
+            sample_label(
+                Decimal("-2.3"),
+                Decimal("2.1"),
+                Decimal("23"),
+                compact=True,
+            ),
+            r"$\kappa_3=2.1,\;\kappa_4=23,\;\kappa_{3t}=-2.3$",
+        )
 
     def test_only_the_all_sm_point_is_labelled_sm(self) -> None:
         self.assertEqual(

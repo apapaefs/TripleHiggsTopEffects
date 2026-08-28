@@ -43,5 +43,6 @@ python3 scripts/plot_ct3_shapes.py \
   --expected-beam-energy-gev "$EBEAM" \
   --m3h-range 400 1200 \
   --sum-pt-range 0 1200 \
+  --separate-panels \
   --output "$FIGURE_OUTPUT" \
   --collider-label "$COLLIDER_LABEL"

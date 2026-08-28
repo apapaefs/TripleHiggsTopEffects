@@ -419,7 +419,9 @@ def total_variation_distance(
     )
 
 
-def sample_label(ct3: Decimal, k3: Decimal, k4: Decimal) -> str:
+def sample_label(
+    ct3: Decimal, k3: Decimal, k4: Decimal, *, compact: bool = False
+) -> str:
     """Label a curve without repeating self-couplings fixed to their SM values."""
     if ct3 == SM_ZERO and k3 == SM_ONE and k4 == SM_ONE:
         return "SM"
@@ -429,7 +431,8 @@ def sample_label(ct3: Decimal, k3: Decimal, k4: Decimal) -> str:
     if k4 != SM_ONE:
         entries.append(rf"\kappa_4={k4}")
     entries.append(rf"\kappa_{{3t}}={ct3}")
-    return "$" + r",\quad ".join(entries) + "$"
+    separator = r",\;" if compact else r",\quad "
+    return "$" + separator.join(entries) + "$"
 
 
 def validate_sample_settings(
@@ -536,7 +539,8 @@ def plot_shapes(
     *,
     m3h_range: Sequence[float] | None = None,
     sum_pt_range: Sequence[float] | None = None,
-) -> tuple[Path, Path, Path, Path, Path, Path]:
+    separate_panels: bool = False,
+) -> tuple[Path, ...]:
     if not samples or len(samples) != len(shapes):
         raise PlotError(
             "plotting requires one non-empty event sample per manifest record"
@@ -594,9 +598,9 @@ def plot_shapes(
             float(sum_pt_edges[-1]),
         )
     styles = (
-        {"color": "black", "linestyle": "-", "linewidth": 1.6},
-        {"color": "#d62728", "linestyle": "--", "linewidth": 1.6},
-        {"color": "#1756d1", "linestyle": ":", "linewidth": 1.8},
+        {"color": "black", "linestyle": "-", "linewidth": 1.4},
+        {"color": "#cc0000", "linestyle": "--", "linewidth": 1.4},
+        {"color": "#0000cc", "linestyle": ":", "linewidth": 1.5},
         {"color": "#2ca02c", "linestyle": "-.", "linewidth": 1.5},
     )
 
@@ -709,7 +713,7 @@ def plot_shapes(
             }
         )
 
-    def render(*, absolute: bool, destination: Path) -> tuple[Path, Path]:
+    def render_combined(*, absolute: bool, destination: Path) -> tuple[Path, Path]:
         figure, axes = plt.subplots(1, 2, figsize=(8.2, 3.9))
         plotted: list[tuple[object, object]] = []
         source_histograms = absolute_histograms if absolute else normalized_histograms
@@ -804,11 +808,173 @@ def plot_shapes(
         plt.close(figure)
         return pdf, png
 
-    normalized_pdf, normalized_png = render(absolute=False, destination=output)
-    unnormalized_output = output.with_name(f"{output.name}-unnormalized")
-    unnormalized_pdf, unnormalized_png = render(
-        absolute=True, destination=unnormalized_output
-    )
+    def render_publication_panel(
+        *, absolute: bool, observable_index: int, destination: Path
+    ) -> tuple[Path, Path]:
+        from matplotlib import ticker
+
+        panel_height_inches = 271.0 / 72.0
+        figure, axis = plt.subplots(figsize=(4.0, panel_height_inches))
+        source_histograms = absolute_histograms if absolute else normalized_histograms
+        edges = m3h_edges if observable_index == 0 else sum_pt_edges
+        lower = m3h_lower if observable_index == 0 else sum_pt_lower
+        upper = m3h_upper if observable_index == 0 else sum_pt_upper
+        plotted = []
+        for index, (sample, histograms) in enumerate(
+            zip(samples, source_histograms)
+        ):
+            histogram = histograms[observable_index]
+            plotted.append(histogram)
+            axis.stairs(
+                histogram,
+                edges,
+                baseline=None,
+                label=sample_label(
+                    sample.ct3, sample.k3, sample.k4, compact=True
+                ),
+                **styles[index % len(styles)],
+            )
+
+        positive = [
+            float(value)
+            for histogram in plotted
+            for value in histogram
+            if value > 0
+        ]
+        axis.set_xlim(lower, upper)
+        axis.set_ylim(min(positive) * 0.7, max(positive) * 1.7)
+        axis.set_yscale("log")
+        axis.set_title(collider_label, fontsize=14, pad=7)
+        axis.xaxis.set_major_locator(ticker.MultipleLocator(200.0))
+        axis.xaxis.set_minor_locator(ticker.MultipleLocator(50.0))
+        major_subs = (1.0, 5.0) if observable_index == 0 else (1.0,)
+        axis.yaxis.set_major_locator(
+            ticker.LogLocator(base=10.0, subs=major_subs, numticks=20)
+        )
+        axis.yaxis.set_minor_locator(
+            ticker.LogLocator(
+                base=10.0,
+                subs=(2.0, 3.0, 4.0, 6.0, 7.0, 8.0, 9.0),
+                numticks=100,
+            )
+        )
+
+        def format_log_tick(value: float, _position: float) -> str:
+            if value <= 0.0:
+                return ""
+            exponent = int(round(math.log10(value)))
+            if value >= 1.0e-3:
+                return f"{value:.3f}"
+            if math.isclose(value, 10.0**exponent, rel_tol=1.0e-10):
+                return rf"$10^{{{exponent}}}$"
+            return ""
+
+        axis.yaxis.set_major_formatter(ticker.FuncFormatter(format_log_tick))
+        axis.yaxis.set_minor_formatter(ticker.NullFormatter())
+        axis.tick_params(
+            which="major",
+            direction="in",
+            top=True,
+            right=True,
+            length=4.0,
+            width=0.9,
+            labelsize=11.5,
+        )
+        axis.tick_params(
+            which="minor",
+            direction="in",
+            top=True,
+            right=True,
+            length=2.2,
+            width=0.8,
+        )
+        if observable_index == 0:
+            axis.set_xlabel(r"$m_{3h}\;[\mathrm{GeV}]$", fontsize=13.5)
+            if absolute:
+                axis.set_ylabel(
+                    r"$d\sigma/dm_{3h}"
+                    r"\;[\mathrm{pb}/(40\,\mathrm{GeV})]$",
+                    fontsize=13.5,
+                )
+            else:
+                axis.set_ylabel(
+                    r"$1/\sigma\;d\sigma/dm_{3h}"
+                    r"\;[1/(40\,\mathrm{GeV})]$",
+                    fontsize=13.5,
+                )
+        else:
+            axis.set_xlabel(r"$\sum p_{T,h}\;[\mathrm{GeV}]$", fontsize=13.5)
+            if absolute:
+                axis.set_ylabel(
+                    r"$d\sigma/(d\sum p_{T,h})"
+                    r"\;[\mathrm{pb}/(40\,\mathrm{GeV})]$",
+                    fontsize=13.5,
+                )
+            else:
+                axis.set_ylabel(
+                    r"$1/\sigma\;d\sigma/(d\sum p_{T,h})"
+                    r"\;[1/(40\,\mathrm{GeV})]$",
+                    fontsize=13.5,
+                )
+        axis.legend(
+            frameon=False,
+            fontsize=9.3,
+            loc="lower left",
+            bbox_to_anchor=(0.055, 0.075),
+            borderaxespad=0.0,
+            handlelength=2.0,
+            handletextpad=0.7,
+            labelspacing=1.45,
+        )
+        figure.subplots_adjust(left=0.20, right=0.92, bottom=0.155, top=0.91)
+        pdf = destination.with_suffix(".pdf")
+        png = destination.with_suffix(".png")
+        figure.savefig(pdf)
+        figure.savefig(png, dpi=240)
+        plt.close(figure)
+        return pdf, png
+
+    if separate_panels:
+        normalized_m3h = render_publication_panel(
+            absolute=False,
+            observable_index=0,
+            destination=output.with_name(f"{output.name}-m3h"),
+        )
+        normalized_sum_pt = render_publication_panel(
+            absolute=False,
+            observable_index=1,
+            destination=output.with_name(f"{output.name}-sum-pth"),
+        )
+        unnormalized_m3h = render_publication_panel(
+            absolute=True,
+            observable_index=0,
+            destination=output.with_name(f"{output.name}-m3h-unnormalized"),
+        )
+        unnormalized_sum_pt = render_publication_panel(
+            absolute=True,
+            observable_index=1,
+            destination=output.with_name(f"{output.name}-sum-pth-unnormalized"),
+        )
+        plot_outputs = (
+            *normalized_m3h,
+            *normalized_sum_pt,
+            *unnormalized_m3h,
+            *unnormalized_sum_pt,
+        )
+    else:
+        normalized_pdf, normalized_png = render_combined(
+            absolute=False, destination=output
+        )
+        unnormalized_output = output.with_name(f"{output.name}-unnormalized")
+        unnormalized_pdf, unnormalized_png = render_combined(
+            absolute=True, destination=unnormalized_output
+        )
+        plot_outputs = (
+            normalized_pdf,
+            normalized_png,
+            unnormalized_pdf,
+            unnormalized_png,
+        )
     summary = output.with_suffix(".csv")
     write_summary(summary, samples, shapes)
     validation = output.with_name(f"{output.name}-validation.json")
@@ -816,6 +982,7 @@ def plot_shapes(
         json.dumps(
             {
                 "checks_passed": True,
+                "separate_panels": separate_panels,
                 "common_settings": {
                     "pdlabel": samples[0].pdlabel,
                     "lhaid": samples[0].lhaid,
@@ -861,14 +1028,7 @@ def plot_shapes(
         + "\n",
         encoding="utf-8",
     )
-    return (
-        normalized_pdf,
-        normalized_png,
-        unnormalized_pdf,
-        unnormalized_png,
-        summary,
-        validation,
-    )
+    return (*plot_outputs, summary, validation)
 
 
 def decimal_argument(value: str) -> Decimal:
@@ -921,6 +1081,14 @@ def parse_args() -> argparse.Namespace:
         nargs=2,
         metavar=("LOW", "HIGH"),
         help="fixed sum-pT plotting range in GeV (default: adaptive)",
+    )
+    parser.add_argument(
+        "--separate-panels",
+        action="store_true",
+        help=(
+            "write standalone m3h and sum-pT panels with internal legends "
+            "in the publication distribution style"
+        ),
     )
     parser.add_argument("--expected-pdlabel")
     parser.add_argument("--expected-lhaid", type=int)
@@ -1025,6 +1193,7 @@ def main() -> int:
         args.collider_label,
         m3h_range=args.m3h_range,
         sum_pt_range=args.sum_pt_range,
+        separate_panels=args.separate_panels,
     )
     for path in outputs:
         print(f"Wrote {path}")
