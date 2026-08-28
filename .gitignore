@@ -3,9 +3,9 @@
 /MG5_aMC_v*.tar.gz
 /multihiggs_loop_sm/
 
-# Generated campaign state and event products.
+# Generated campaign state and large event products.  Compact manifests, fit
+# results, and publication figures under artifacts/ are retained for provenance.
 /.work/
-/artifacts/
 /logs/
 /ME5_debug
 *.lhe
@@ -15,6 +15,20 @@
 *.root
 *.yoda
 *.yoda.gz
+
+# Imported manuscript archives and LaTeX build intermediates.  Source .tex
+# files and compiled publication PDFs remain tracked.
+/HHH_YR5.zip
+/__MACOSX/
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
 
 # Python caches and test state.
 __pycache__/

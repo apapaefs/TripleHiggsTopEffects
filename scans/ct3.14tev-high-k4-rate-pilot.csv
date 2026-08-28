@@ -1,0 +1,10 @@
+# 14 TeV pilot around the two predicted SM-rate roots at k4=17 and ct3=-0.20.
+# k3/k4 are physical kappas; the driver writes D3=k3-1 and D4=k4-1.
+# The existing 100k k3=k4=1, ct3=0 sample supplies the SM reference.
+name,k3,k4,ct3
+rate14_k3_p1p9_k4_p17_ct3_m0p2,1.9,17,-0.20
+rate14_k3_p2p0_k4_p17_ct3_m0p2,2.0,17,-0.20
+rate14_k3_p2p1_k4_p17_ct3_m0p2,2.1,17,-0.20
+rate14_k3_p2p3_k4_p17_ct3_m0p2,2.3,17,-0.20
+rate14_k3_p2p4_k4_p17_ct3_m0p2,2.4,17,-0.20
+rate14_k3_p2p5_k4_p17_ct3_m0p2,2.5,17,-0.20

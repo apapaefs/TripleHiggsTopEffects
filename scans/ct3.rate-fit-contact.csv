@@ -1,0 +1,22 @@
+# Nonzero-kappa3t anchors for the publication-rate fit.
+name,k3,k4,ct3
+ratefit_contact_a_m5,-8,50,-5
+ratefit_contact_a_m0p5,-8,50,-0.5
+ratefit_contact_a_p0p5,-8,50,0.5
+ratefit_contact_a_p5,-8,50,5
+ratefit_contact_b_m5,6,50,-5
+ratefit_contact_b_m0p5,6,50,-0.5
+ratefit_contact_b_p0p5,6,50,0.5
+ratefit_contact_b_p5,6,50,5
+ratefit_contact_c_m5,-5,-50,-5
+ratefit_contact_c_m0p5,-5,-50,-0.5
+ratefit_contact_c_p0p5,-5,-50,0.5
+ratefit_contact_c_p5,-5,-50,5
+ratefit_contact_d_m5,3,-50,-5
+ratefit_contact_d_m0p5,3,-50,-0.5
+ratefit_contact_d_p0p5,3,-50,0.5
+ratefit_contact_d_p5,3,-50,5
+ratefit_contact_sm_m5,1,1,-5
+ratefit_contact_sm_m0p5,1,1,-0.5
+ratefit_contact_sm_p0p5,1,1,0.5
+ratefit_contact_sm_p5,1,1,5

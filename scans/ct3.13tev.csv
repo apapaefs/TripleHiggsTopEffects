@@ -1,4 +1,5 @@
-# 13 TeV production grid: CT1=1 and CT2=0 are enforced by the driver.
+# 13 TeV production grid: k3/k4 are kappas; the driver writes D3=k3-1, D4=k4-1.
+# CT1=0 (kappa_t=1) and CT2=0 are enforced by the driver.
 name,k3,k4,ct3
 k3_m8_k4_p50_ct3_m5,-8,50,-5.0
 k3_m8_k4_p50_ct3_p5,-8,50,5.0

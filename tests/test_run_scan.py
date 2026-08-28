@@ -8,10 +8,12 @@ from pathlib import Path
 
 from scripts.run_scan import (
     CampaignError,
+    DEFAULT_CT1,
     LHA_CODES,
     extract_run_settings,
     extract_slha_parameters,
     generate_events_command,
+    integration_result,
     load_points,
     replace_run_settings,
     replace_slha_parameters,
@@ -41,6 +43,7 @@ RUN_CARD = """  1000 = nevents ! requested events
   nn23lo1 = pdlabel ! PDF
   230000 = lhaid ! PDF ID
   -1 = dynamical_scale_choice ! scale
+  1.0 = scalefact ! scale multiplier
   True = use_syst ! systematics
 """
 
@@ -58,22 +61,35 @@ class PointTests(unittest.TestCase):
         path = self.write_csv("name,k3,k4,ct2\np1,2,-1,0.5\n")
         point = load_points(path, "ct2")[0]
         self.assertEqual(point.run_name, "ct2_p1")
+        self.assertEqual(point.kappas(), {"k3": Decimal("2"), "k4": Decimal("-1")})
         self.assertEqual(
-            point.couplings(Decimal("1")),
+            point.card_couplings(DEFAULT_CT1),
             {
-                "ct1": Decimal("1"),
+                "ct1": Decimal("0"),
                 "ct2": Decimal("0.5"),
                 "ct3": Decimal("0"),
-                "k3": Decimal("2"),
-                "k4": Decimal("-1"),
+                "d3": Decimal("1"),
+                "d4": Decimal("-2"),
             },
         )
 
     def test_ct3_point_sets_inactive_ct2_to_zero(self) -> None:
         path = self.write_csv("# example\nname,k3,k4,ct3\np2,1,1,-0.25\n")
         point = load_points(path, "ct3")[0]
-        self.assertEqual(point.couplings(Decimal("1"))["ct2"], Decimal("0"))
-        self.assertEqual(point.couplings(Decimal("1"))["ct3"], Decimal("-0.25"))
+        self.assertEqual(point.card_couplings(DEFAULT_CT1)["ct2"], Decimal("0"))
+        self.assertEqual(
+            point.card_couplings(DEFAULT_CT1)["ct3"], Decimal("-0.25")
+        )
+
+    def test_sm_kappas_write_zero_self_coupling_shifts(self) -> None:
+        path = self.write_csv("name,k3,k4,ct2\nsm,1,1,0\n")
+        point = load_points(path, "ct2")[0]
+        couplings = point.card_couplings(DEFAULT_CT1)
+        self.assertEqual(couplings["d3"], Decimal("0"))
+        self.assertEqual(couplings["d4"], Decimal("0"))
+
+    def test_default_ct1_is_sm_top_yukawa(self) -> None:
+        self.assertEqual(DEFAULT_CT1, Decimal("0"))
 
     def test_wrong_columns_are_rejected(self) -> None:
         path = self.write_csv("name,k3,k4,ct3\np1,1,1,0\n")
@@ -84,11 +100,11 @@ class PointTests(unittest.TestCase):
 class CardTests(unittest.TestCase):
     def test_all_five_bsm_parameters_are_replaced(self) -> None:
         expected = {
-            LHA_CODES["ct1"]: Decimal("1"),
+            LHA_CODES["ct1"]: Decimal("0"),
             LHA_CODES["ct2"]: Decimal("2"),
             LHA_CODES["ct3"]: Decimal("0"),
-            LHA_CODES["k3"]: Decimal("-1.5"),
-            LHA_CODES["k4"]: Decimal("3"),
+            LHA_CODES["d3"]: Decimal("-1.5"),
+            LHA_CODES["d4"]: Decimal("3"),
         }
         updated = replace_slha_parameters(PARAM_CARD, expected)
         self.assertEqual(extract_slha_parameters(updated, list(expected)), expected)
@@ -103,10 +119,23 @@ class CardTests(unittest.TestCase):
             "pdlabel": "lhapdf",
             "lhaid": "260000",
             "dynamical_scale_choice": "3",
+            "scalefact": "0.5",
             "use_syst": "False",
         }
         updated = replace_run_settings(RUN_CARD, updates)
         self.assertEqual(extract_run_settings(updated, list(updates)), updates)
+
+    def test_integration_result_reads_cross_section_and_error(self) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        process = Path(temporary.name) / "process"
+        banner = process / "Events" / "run" / "run_banner.txt"
+        banner.parent.mkdir(parents=True)
+        banner.write_text("banner\n", encoding="utf-8")
+        results = process / "SubProcesses" / "results.dat"
+        results.parent.mkdir(parents=True)
+        results.write_text("0.42100D-04 0.12500D-07 0 0\n", encoding="utf-8")
+        self.assertEqual(integration_result(banner), ("0.42100E-04", "0.12500E-07"))
 
     def test_pdf_labels_are_set_for_global_and_both_beams(self) -> None:
         updated = set_pdf_labels(RUN_CARD, "lhapdf")
@@ -210,6 +239,42 @@ class ProductionGridTests(unittest.TestCase):
             {point.active_contact for point in points},
             {Decimal("-5"), Decimal("5")},
         )
+
+    def test_ct3_sm_shape_grid_uses_physical_sm_kappas(self) -> None:
+        expected_contacts = {
+            Decimal("-0.05"),
+            Decimal("-0.025"),
+            Decimal("0"),
+            Decimal("0.025"),
+            Decimal("0.05"),
+            Decimal("0.075"),
+            Decimal("0.10"),
+            Decimal("0.125"),
+            Decimal("0.15"),
+            Decimal("0.18"),
+            Decimal("0.20"),
+            Decimal("0.25"),
+        }
+        for filename in (
+            "ct3.13tev-sm-shapes.csv",
+            "ct3.14tev-sm-shapes.csv",
+        ):
+            with self.subTest(filename=filename):
+                points = load_points(REPOSITORY_ROOT / "scans" / filename, "ct3")
+                self.assertEqual(len(points), 12)
+                self.assertEqual(
+                    {(point.k3, point.k4) for point in points},
+                    {(Decimal("1"), Decimal("1"))},
+                )
+                self.assertEqual(
+                    {point.active_contact for point in points}, expected_contacts
+                )
+                for point in points:
+                    couplings = point.card_couplings(DEFAULT_CT1)
+                    self.assertEqual(couplings["d3"], Decimal("0"))
+                    self.assertEqual(couplings["d4"], Decimal("0"))
+                    self.assertEqual(couplings["ct1"], Decimal("0"))
+                    self.assertEqual(couplings["ct2"], Decimal("0"))
 
 
 if __name__ == "__main__":

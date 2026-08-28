@@ -24,7 +24,8 @@ from typing import Iterator, Mapping, Sequence
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MG5_ROOT = REPOSITORY_ROOT / "MG5_aMC_v3_5_16"
-LHA_CODES = {"ct1": 993, "ct2": 994, "ct3": 995, "k3": 996, "k4": 997}
+DEFAULT_CT1 = Decimal("0")
+LHA_CODES = {"ct1": 993, "ct2": 994, "ct3": 995, "d3": 996, "d4": 997}
 RUN_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_]*$")
 BLOCK_RE = re.compile(r"^\s*BLOCK\s+(\S+)", re.IGNORECASE)
 SLHA_ENTRY_RE = re.compile(r"^(\s*)(\d+)(\s+)([^\s#]+)(.*)$")
@@ -43,14 +44,20 @@ class ScanPoint:
     k4: Decimal
     active_contact: Decimal
 
-    def couplings(self, ct1: Decimal) -> dict[str, Decimal]:
+    def card_couplings(self, ct1: Decimal) -> dict[str, Decimal]:
+        """Return the anomalous inputs written to the UFO parameter card."""
         return {
             "ct1": ct1,
             "ct2": self.active_contact if self.scan == "ct2" else Decimal(0),
             "ct3": self.active_contact if self.scan == "ct3" else Decimal(0),
-            "k3": self.k3,
-            "k4": self.k4,
+            # The UFO also contains the ordinary SM hhh and hhhh vertices.
+            # Its D3 and D4 inputs are therefore anomalous shifts, not kappas.
+            "d3": self.k3 - Decimal(1),
+            "d4": self.k4 - Decimal(1),
         }
+
+    def kappas(self) -> dict[str, Decimal]:
+        return {"k3": self.k3, "k4": self.k4}
 
     @property
     def run_name(self) -> str:
@@ -368,6 +375,7 @@ def validate_completed_run(
     pdlabel: str | None,
     lhaid: int | None,
     dynamical_scale_choice: int | None,
+    scalefact: Decimal | None,
     survey_splitting: int | None,
     use_systematics: bool | None,
 ) -> tuple[Path, Path]:
@@ -390,6 +398,7 @@ def validate_completed_run(
             "pdlabel",
             "lhaid",
             "dynamical_scale_choice",
+            "scalefact",
             "survey_splitting",
             "use_syst",
         ],
@@ -412,6 +421,8 @@ def validate_completed_run(
         raise CampaignError(
             f"existing run {run_dir.name} has a different dynamical scale choice"
         )
+    if scalefact is not None and Decimal(settings.get("scalefact", "NaN")) != scalefact:
+        raise CampaignError(f"existing run {run_dir.name} has a different scalefact")
     if survey_splitting is not None and int(
         settings.get("survey_splitting", "-999")
     ) != survey_splitting:
@@ -439,6 +450,18 @@ def git_revision() -> str | None:
     return result.stdout.strip() if result.returncode == 0 else None
 
 
+def integration_result(banner: Path) -> tuple[str | None, str | None]:
+    """Read MadGraph's final cross section and integration error."""
+    results = banner.parents[2] / "SubProcesses" / "results.dat"
+    try:
+        fields = results.read_text(encoding="utf-8").split()
+    except OSError:
+        return None, None
+    if len(fields) < 2:
+        return None, None
+    return tuple(field.replace("D", "E").replace("d", "e") for field in fields[:2])
+
+
 def banner_summary(banner: Path) -> dict[str, str | int | None]:
     text = banner.read_text(encoding="utf-8", errors="replace")
     cross_section = re.search(
@@ -452,22 +475,29 @@ def banner_summary(banner: Path) -> dict[str, str | int | None]:
             "pdlabel",
             "lhaid",
             "dynamical_scale_choice",
+            "scalefact",
             "survey_splitting",
             "use_syst",
         ],
     )
+    integrated_cross_section, integration_error = integration_result(banner)
     use_syst = settings.get("use_syst")
     return {
         "cross_section_pb": (
-            cross_section.group(1).replace("D", "E").replace("d", "e")
-            if cross_section
-            else None
+            integrated_cross_section
+            or (
+                cross_section.group(1).replace("D", "E").replace("d", "e")
+                if cross_section
+                else None
+            )
         ),
+        "cross_section_error_pb": integration_error,
         "generated_events": int(event_count.group(1)) if event_count else None,
         "seed": int(settings["iseed"]) if "iseed" in settings else None,
         "pdlabel": settings.get("pdlabel"),
         "lhaid": settings.get("lhaid"),
         "dynamical_scale_choice": settings.get("dynamical_scale_choice"),
+        "scalefact": settings.get("scalefact"),
         "survey_splitting": settings.get("survey_splitting"),
         "systematics_enabled": (
             use_syst.lower() == "true" if use_syst is not None else None
@@ -497,6 +527,8 @@ def copy_and_record(
         "run_name": point.run_name,
         "scan": point.scan,
         "couplings": {name: str(value) for name, value in couplings.items()},
+        "kappas": {name: str(value) for name, value in point.kappas().items()},
+        "self_coupling_convention": "k3=1+D3,k4=1+D4",
         "requested_events": events,
         "beam_energy_gev": str(ebeam),
         "lhe": str(destination.resolve()),
@@ -523,6 +555,7 @@ def plan_payload(
     pdlabel: str | None,
     lhaid: int | None,
     dynamical_scale_choice: int | None,
+    scalefact: Decimal | None,
     survey_splitting: int | None,
     use_systematics: bool | None,
 ) -> dict[str, object]:
@@ -535,13 +568,18 @@ def plan_payload(
         "pdlabel": pdlabel,
         "lhaid": lhaid,
         "dynamical_scale_choice": dynamical_scale_choice,
+        "scalefact": str(scalefact) if scalefact is not None else None,
         "survey_splitting": survey_splitting,
         "systematics_enabled": use_systematics,
         "points": [
             {
                 "run_name": point.run_name,
+                "kappas": {
+                    name: str(value) for name, value in point.kappas().items()
+                },
                 "couplings": {
-                    name: str(value) for name, value in point.couplings(ct1).items()
+                    name: str(value)
+                    for name, value in point.card_couplings(ct1).items()
                 },
             }
             for point in points
@@ -573,7 +611,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--events", type=int, required=True)
     parser.add_argument("--cores", type=int, default=1)
     parser.add_argument("--ebeam", type=decimal_arg, default=Decimal("6800"))
-    parser.add_argument("--ct1", type=decimal_arg, default=Decimal("1"))
+    parser.add_argument(
+        "--ct1",
+        type=decimal_arg,
+        default=DEFAULT_CT1,
+        help="anomalous top-Yukawa shift c_t1 (default: 0, so kappa_t=1)",
+    )
     parser.add_argument(
         "--seed-start",
         type=int,
@@ -586,6 +629,11 @@ def parse_args() -> argparse.Namespace:
         "--dynamical-scale-choice",
         type=int,
         help="optional run-card dynamical_scale_choice override",
+    )
+    parser.add_argument(
+        "--scalefact",
+        type=decimal_arg,
+        help="optional multiplicative factor applied to the dynamical scale",
     )
     parser.add_argument(
         "--survey-splitting",
@@ -627,6 +675,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("--seed-start must be non-negative")
     if args.survey_splitting is not None and args.survey_splitting <= 0:
         parser.error("--survey-splitting must be positive")
+    if args.scalefact is not None and args.scalefact <= 0:
+        parser.error("--scalefact must be positive")
     if (args.pdlabel is None) != (args.lhaid is None):
         parser.error("--pdlabel and --lhaid must be supplied together")
     return args
@@ -655,6 +705,7 @@ def main() -> int:
         pdlabel=args.pdlabel,
         lhaid=args.lhaid,
         dynamical_scale_choice=args.dynamical_scale_choice,
+        scalefact=args.scalefact,
         survey_splitting=args.survey_splitting,
         use_systematics=args.use_systematics,
     )
@@ -676,7 +727,7 @@ def main() -> int:
     with process_lock(process_dir):
         try:
             for index, point in enumerate(points):
-                couplings = point.couplings(args.ct1)
+                couplings = point.card_couplings(args.ct1)
                 seed = args.seed_start + index if args.seed_start else 0
                 run_dir = process_dir / "Events" / point.run_name
 
@@ -694,6 +745,7 @@ def main() -> int:
                         pdlabel=args.pdlabel,
                         lhaid=args.lhaid,
                         dynamical_scale_choice=args.dynamical_scale_choice,
+                        scalefact=args.scalefact,
                         survey_splitting=args.survey_splitting,
                         use_systematics=args.use_systematics,
                     )
@@ -729,6 +781,8 @@ def main() -> int:
                     run_updates["dynamical_scale_choice"] = str(
                         args.dynamical_scale_choice
                     )
+                if args.scalefact is not None:
+                    run_updates["scalefact"] = format_decimal(args.scalefact)
                 if args.use_systematics is not None:
                     run_updates["use_syst"] = str(args.use_systematics)
                 updated_run = replace_run_settings(
@@ -758,8 +812,19 @@ def main() -> int:
                         f"{exc.returncode}"
                     ) from exc
 
-                lhe = run_lhe(run_dir)
-                banner = latest_banner(run_dir)
+                lhe, banner = validate_completed_run(
+                    run_dir,
+                    couplings,
+                    events=args.events,
+                    ebeam=args.ebeam,
+                    seed=seed,
+                    pdlabel=args.pdlabel,
+                    lhaid=args.lhaid,
+                    dynamical_scale_choice=args.dynamical_scale_choice,
+                    scalefact=args.scalefact,
+                    survey_splitting=args.survey_splitting,
+                    use_systematics=args.use_systematics,
+                )
                 destination = copy_and_record(
                     lhe=lhe,
                     banner=banner,

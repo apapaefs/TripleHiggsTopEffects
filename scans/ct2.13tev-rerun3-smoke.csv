@@ -1,0 +1,4 @@
+# Ten-event pilot for the Tiresias three-point rerun campaign.
+# CT1=0 and CT3=0 are enforced by the campaign driver.
+name,k3,k4,ct2
+smoke_rerun3_tiresias_k3_p6_k4_p50_ct2_m0p1,6,50,-0.1

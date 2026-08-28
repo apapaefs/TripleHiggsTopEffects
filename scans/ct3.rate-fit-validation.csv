@@ -1,0 +1,8 @@
+# Independent off-grid validation points for the publication-rate fit.
+name,k3,k4,ct3
+ratefit_validation_near_sm_p0p25,1,1,0.25
+ratefit_validation_near_sm_m0p35,1.5,1,-0.35
+ratefit_validation_broad_a,-2,25,1.5
+ratefit_validation_broad_b,4,25,-2
+ratefit_validation_broad_c,-2,-25,-1.5
+ratefit_validation_broad_d,4,-25,2

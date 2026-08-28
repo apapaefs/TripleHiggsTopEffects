@@ -1,0 +1,4 @@
+# 14 TeV 100k-event replacement for the kappa4=0 rate-matched benchmark.
+# k3/k4 are physical kappas; the driver writes D3=k3-1 and D4=k4-1.
+name,k3,k4,ct3
+production14_k3_p1p9_k4_p0_ct3_p0p4,1.9,0,0.40

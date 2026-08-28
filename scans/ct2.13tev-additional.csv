@@ -1,4 +1,5 @@
-# Additional 13 TeV grid. CT1=0 and CT3=0 are enforced by the driver.
+# Additional 13 TeV grid. k3/k4 are kappas; the driver writes D3=k3-1, D4=k4-1.
+# CT1=0 and CT3=0 are enforced by the driver.
 # The ct2=0 rows are the single zero-contact reference for each (k3,k4) point.
 name,k3,k4,ct2
 k3_m8_k4_p50_ct2_m0p1,-8,50,-0.1

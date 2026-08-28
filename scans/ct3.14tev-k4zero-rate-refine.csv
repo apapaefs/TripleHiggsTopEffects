@@ -1,0 +1,4 @@
+# 14 TeV refinement after the k3=1.806 pilot measured sigma/sigma_SM=1.0502.
+# k3/k4 are physical kappas; the driver writes D3=0.868 and D4=-1.
+name,k3,k4,ct3
+rate14_k3_p1p868_k4_p0_ct3_p0p4,1.868,0,0.40

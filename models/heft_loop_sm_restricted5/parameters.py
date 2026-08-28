@@ -829,7 +829,7 @@ Axial_tbGm = Parameter(name = 'Axial_tbGm',
 CT1 = Parameter(name = 'CT1',
                nature = 'external',
                type = 'real',
-               value = 1.3,
+               value = 0.0,
                texname = '\\text{CT1}',
                lhablock = 'BSMINPUTS',
                lhacode = [ 993 ])

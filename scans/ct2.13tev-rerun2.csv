@@ -1,0 +1,5 @@
+# Two remaining 13 TeV ct2 points rerun on Tiresias.
+# CT1=0 and CT3=0 are enforced by the campaign driver.
+name,k3,k4,ct2
+k3_m5_k4_m50_reference,-5,-50,0
+k3_p1_k4_p1_ct2_p4,1,1,4.0

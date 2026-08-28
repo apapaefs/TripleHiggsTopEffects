@@ -1,0 +1,6 @@
+# Three slow 13 TeV ct2 points rerun on Tiresias.
+# CT1=0 and CT3=0 are enforced by the campaign driver.
+name,k3,k4,ct2
+k3_m5_k4_m50_ct2_m0p1,-5,-50,-0.1
+k3_p1_k4_p1_ct2_p0p6,1,1,0.6
+k3_p6_k4_p50_ct2_m0p1,6,50,-0.1

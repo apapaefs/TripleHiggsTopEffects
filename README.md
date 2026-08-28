@@ -18,26 +18,53 @@ The restricted UFO uses the following names in `BLOCK BSMINPUTS`:
 
 | Scan name | UFO name | LHA code |
 |---|---|---:|
-| `ct1` | `CT1` | 993 |
+| `ct1 = c_t1` | `CT1` | 993 |
 | `ct2` | `CT2` | 994 |
 | `ct3` | `CT3` | 995 |
-| `k3 = 1 + c3` | `D3` | 996 |
-| `k4 = 1 + d4` | `D4` | 997 |
+| `c3 = k3 - 1` | `D3` | 996 |
+| `d4 = k4 - 1` | `D4` | 997 |
 
-The campaign driver supports two families:
+The UFO contains the ordinary SM top-Yukawa vertex and a separate anomalous
+vertex proportional to `CT1`.  Consequently,
 
-- `ct2`: vary `(k3, k4, ct2)`, fix `CT1=1` and `CT3=0`;
-- `ct3`: vary `(k3, k4, ct3)`, fix `CT1=1` and `CT2=0`.
+```text
+kappa_t = 1 + CT1
+```
 
-The UFO's `D3` and `D4` parameters multiply the SM triple- and quartic-Higgs
-vertices directly, so CSV inputs are `k3` and `k4`, not the shifted anomalous
-coefficients.  For example, `(k3, k4) = (-8, 50)` is written as
-`D3=-8, D4=50`.  This agrees with the convention in
+`CT1` is the anomalous shift `c_t1`, not the full top-Yukawa multiplier.
+The SM top-Yukawa baseline is therefore `CT1=0`.  The campaign driver supports
+two families:
+
+- `ct2`: vary `(k3, k4, ct2)`, fix `CT1=0` and `CT3=0`;
+- `ct3`: vary `(k3, k4, ct3)`, fix `CT1=0` and `CT2=0`.
+
+The UFO contains separate ordinary-SM `hhh` and `hhhh` vertices and additional
+MHEFT vertices proportional to its external inputs `D3` and `D4`.  Consequently,
+
+```text
+k3 = 1 + D3
+k4 = 1 + D4
+```
+
+Here the UFO name `D3` is the anomalous cubic shift commonly denoted `c3`.
+The SM self-coupling point is therefore `D3=0, D4=0`, corresponding to
+`k3=k4=1`.  CSV inputs remain the physically labelled kappas `k3` and `k4`;
+the driver performs the offset when writing `BLOCK BSMINPUTS`:
+
+| Requested `(k3,k4)` | Card `(D3,D4)` |
+|---:|---:|
+| `(-8,50)` | `(-9,49)` |
+| `(6,50)` | `(5,49)` |
+| `(-5,-50)` | `(-6,-51)` |
+| `(3,-50)` | `(2,-51)` |
+| `(1,1)` | `(0,0)` |
+
+These definitions follow the shifted-coupling convention in
 [arXiv:2312.13562](https://arxiv.org/abs/2312.13562).
 
-`--ct1` can override the `CT1=1` convention explicitly.  Every run writes all
-five couplings into the parameter card, so it never inherits the UFO's
-illustrative defaults.
+`--ct1` can override the `CT1=0` convention for a deliberate non-SM
+top-Yukawa scan.  Every run writes all five couplings into the parameter card,
+so it never inherits an old or externally supplied card value.
 
 The preparation script generates
 
@@ -84,8 +111,9 @@ multihiggs_loop_sm/
 
 The current process directory is
 `MG5_aMC_v3_5_16/gg_hhh_restricted5`.  Generated LHE files are copied to
-`artifacts/lhe/`; both the MadGraph event directories and `artifacts/` remain
-untracked.
+`artifacts/lhe/`; the MadGraph event directories and large LHE samples remain
+untracked.  Compact manifests, fit results, and publication figures may be
+version-controlled for provenance and reproducibility.
 
 ## Prepare a process
 
@@ -146,8 +174,9 @@ and underscores, and must not start with an underscore.  They become part of
 the MadGraph run name.  Use new names when changing the couplings, energy,
 event count, PDF, or scale of a previously attempted campaign.
 
-The CSV values are the direct multipliers `k3` and `k4`.  Convert anomalous
-parameters before writing the file: `k3=1+c3` and `k4=1+d4`.  The files
+The CSV values are the total multipliers `k3` and `k4`.  Convert anomalous
+parameters before writing the file: `k3=1+c3` and `k4=1+d4`.  The driver then
+writes `D3=k3-1` and `D4=k4-1` to the UFO card.  The files
 `scans/ct2.example.csv` and `scans/ct3.example.csv` provide minimal templates.
 
 ## Run a custom scan on Tiresias
@@ -173,7 +202,7 @@ python3 scripts/run_scan.py \
   --events 20000 \
   --cores 1 \
   --ebeam 7000 \
-  --ct1 1 \
+  --ct1 0 \
   --pdlabel lhapdf \
   --lhaid 331900 \
   --dynamical-scale-choice 3 \
@@ -202,7 +231,7 @@ python3 scripts/run_scan.py \
   --events 20000 \
   --cores 1 \
   --ebeam 7000 \
-  --ct1 1 \
+  --ct1 0 \
   --pdlabel lhapdf \
   --lhaid 331900 \
   --dynamical-scale-choice 3 \
@@ -224,16 +253,17 @@ The principal command-line settings are:
 | `--events N` | Requested events for every CSV row |
 | `--cores N` | MadGraph cores used for the current point |
 | `--ebeam E` | Energy of each proton in GeV |
-| `--ct1 X` | `CT1` value; normally 1 |
+| `--ct1 X` | Anomalous shift `CT1=c_t1`; default 0 gives `kappa_t=1` |
 | `--seed-start N` | Assign consecutive explicit seeds starting at `N` |
 | `--pdlabel lhapdf --lhaid ID` | Select an installed LHAPDF set |
 | `--dynamical-scale-choice N` | Override the MadGraph scale choice |
+| `--scalefact X` | Multiply the selected dynamical renormalization and factorization scales by `X` |
 | `--survey-splitting N` | Explicit survey jobs per integration channel; mainly used by the parallel orchestrator |
 | `--systematics` / `--no-systematics` | Enable or disable event-by-event scale and PDF weights |
 | `--mg5-root PATH` | MadGraph installation containing the process |
 | `--process-dir PATH` | Explicit generated-process directory |
 | `--output-dir PATH` | Destination for copied LHE files and the manifest |
-| `--dry-run` | Print the campaign plan without launching MadGraph |
+| `--dry-run` | Print kappas and their converted card inputs without launching MadGraph |
 | `--resume` | Validate and reuse completed, exactly matching runs |
 
 `run_scan.py` keeps points sequential even when `--cores` is larger than one;
@@ -270,8 +300,8 @@ screen -r hhh_my_scan
 Runs stop at parton level.  MadGraph retains its run under
 `gg_hhh_restricted5/Events/`, while the driver copies the completed LHE to the
 chosen `--output-dir`.  The same directory receives `manifest.jsonl`, including
-the couplings, event count, cross section, PDF and scale settings, checksum,
-and repository revision.
+the couplings, event count, cross section and integration error, PDF and scale
+settings, checksum, and repository revision.
 
 ## Run a custom scan on another computer
 
@@ -285,7 +315,7 @@ python3 scripts/run_scan.py \
   --events 10000 \
   --cores 1 \
   --ebeam 6500 \
-  --ct1 1 \
+  --ct1 0 \
   --pdlabel lhapdf \
   --lhaid 331900 \
   --dynamical-scale-choice 3 \
@@ -309,7 +339,7 @@ This is 24 production jobs and 2.4 million requested events.  Both production
 launchers use 100,000 events per point and 6.5 TeV per beam.  The serial
 launcher explicitly constrains MadGraph to one core per point.  The parallel
 launcher distributes a machine-wide CPU budget across isolated process copies.
-Both use
+Both fix `CT1=0`, corresponding to `kappa_t=1`, and use
 `NNPDF40_lo_as_01180` (LHAPDF ID 331900), and
 MadGraph dynamical-scale choice 3.  The LO PDF is the selected campaign setup;
 the scale choice follows the simulation setup documented in arXiv:2312.13562.
@@ -331,6 +361,208 @@ only if the pilot succeeds:
 ```bash
 scripts/run_13tev_serial.sh
 ```
+
+### Corrected 55-point campaign on Tiresias and Odysseus
+
+The four tracked production/additional CSVs contain 55 unique samples in
+total: 35 `ct2` points and 20 `ct3` points.  Both corrected launchers use their
+`k3,k4` columns as kappas and write `D3=k3-1,D4=k4-1`.  Each host first runs a
+10-event `(k3,k4)=(1,1)` pilot and validates that the banner contains
+`CT1=CT2=CT3=D3=D4=0`.
+
+The canonical list is partitioned into three deterministic modulo shards.
+Tiresias takes shard 1 (18 points) and runs two 96-core points at a time on
+192 logical CPUs.  Odysseus takes shards 0 and 2 (37 points) and runs four
+96-core points at a time on 384 logical CPUs.  The shards are disjoint and
+their union is the full 55-point campaign.
+
+Both launchers first run `scripts/validate_13tev_corrected_campaign.py`.  This
+fail-closed check requires the exact 55-point physics grid, independently
+checks `D3=k3-1,D4=k4-1`, fixes `CT1=0`, checks the inactive contact is zero,
+and verifies that the generated matrix element calls both the ordinary-SM and
+anomalous `hhh/hhhh` couplings.  Every completed run is then checked again
+against its stored MadGraph banner before its LHE is published.
+
+After process generation, its runtime card templates can safely be normalized
+to the all-SM point with:
+
+```bash
+python3 scripts/set_generated_process_sm_defaults.py \
+  --process-dir "$PWD/MG5_aMC_v3_5_16/gg_hhh_restricted5"
+```
+
+This post-generation operation is distinct from the UFO restriction card:
+keep the latter's nonzero illustrative `D3/D4` values while generating the
+process so MadGraph does not remove the anomalous vertices.
+
+On Tiresias:
+
+```bash
+cd /home/apapaefs/Projects/TripleHiggsTopEffects
+scripts/run_13tev_corrected_tiresias.sh
+```
+
+On Odysseus:
+
+```bash
+cd /home/apapaefs/Projects/TripleHiggsTopEffects
+scripts/run_13tev_corrected_odysseus.sh
+```
+
+Use `SMOKE_ONLY=1` to run only the convention pilot, `DRY_RUN=1` to inspect a
+host's selected converted inputs, or `PREPARE_ONLY=1` to create its isolated
+workers.  Set `SHARD_COUNT=1 SHARD_INDICES=0 EXPECTED_POINTS=55` only when a
+single host should deliberately run the whole campaign.  The new outputs are
+kept separate from the superseded samples:
+
+```text
+artifacts/lhe/13tev-kappa-corrected/
+.work/13tev-kappa-corrected/
+logs/13tev-kappa-corrected/
+```
+
+### Near-SM-rate `ct3` shape campaign and Figure 6-style plot
+
+`scans/ct3.14tev-sm-shapes.csv` contains 12 HL-LHC points at the physical
+self-coupling point `k3=k4=1`, spanning `ct3=-0.05` through `0.25` with
+additional resolution around `ct3=0.18`.  This interval targets the rate
+degeneracy where the inclusive cross section can remain close to the SM while
+kinematic distributions change.  For every point the driver writes
+`D3=D4=0`, as well as `CT1=CT2=0`; only `CT3` changes.
+
+On Odysseus, generate 100,000 events per point with four 96-core jobs at a
+time at 14 TeV using:
+
+```bash
+cd /home/apapaefs/Projects/TripleHiggsTopEffects
+scripts/run_14tev_ct3_sm_shapes_odysseus.sh
+```
+
+The 14 TeV launcher attaches both its top-level controller and every isolated
+MadGraph worker process group to Odysseus's installed thermal guard.  It reads
+the guard's live controller marker from `/etc/ipmi-thermal-guard.conf` and
+refuses to start if `ipmi-thermal-guard.timer` is not active.  This matters
+because the parallel driver deliberately starts each point in a separate
+process group; marking only the screen controller would not protect the four
+active workers.
+
+For a detached run, use:
+
+```bash
+cd /home/apapaefs/Projects/TripleHiggsTopEffects
+screen -dmS hhh_ct3_shapes bash -lc \
+  'scripts/run_14tev_ct3_sm_shapes_odysseus.sh > logs/14tev-ct3-sm-shapes-launcher.log 2>&1'
+```
+
+The guard checks every 15 seconds.  If it pauses the campaign, it does not
+automatically send `SIGCONT`; after the machine has cooled, inspect and resume
+all marked process groups with the installed guard's `status` and `resume`
+commands.
+
+Use `DRY_RUN=1` to print and validate all converted couplings without
+launching MadGraph.  The dedicated outputs are written under
+`artifacts/lhe/14tev-ct3-sm-shapes/`, with worker state and logs under the
+matching `.work/` and `logs/` directories.  The default seeds are 36001
+through 36012, disjoint from the earlier corrected campaign.
+
+After all samples finish, the launcher automatically runs
+`scripts/plot_ct3_shapes.py`.  It produces a Figure 6-style comparison in
+which `k3=k4=1`, `CT1=CT2=0`, and only `CT3` varies.  The default curves are
+the SM, `ct3=0.10`, and the near-rate-degenerate `ct3=0.18` point.  The two
+panels contain normalized 40 GeV-bin distributions of `m3h` and the scalar
+Higgs transverse-momentum sum.  The same observables are also written as
+unnormalized absolute bin cross sections in pb per 40 GeV bin.  Both figures
+omit `k3` and `k4` from curve labels when they equal one; a non-SM value is
+included directly in that curve's legend entry.  Non-SM legend parameters are
+ordered as `k3`, `k4`, then `kappa3t`.  Outputs are:
+
+```text
+artifacts/figures/14tev-ct3-sm-shapes.pdf
+artifacts/figures/14tev-ct3-sm-shapes.png
+artifacts/figures/14tev-ct3-sm-shapes-unnormalized.pdf
+artifacts/figures/14tev-ct3-sm-shapes-unnormalized.png
+artifacts/figures/14tev-ct3-sm-shapes.csv
+```
+
+To redraw a different set of completed points without regenerating events,
+run, for example:
+
+```bash
+python3 scripts/plot_ct3_shapes.py \
+  --ct3-values 0 0.05 0.18 0.25
+```
+
+For a comparison in which `k3` and `k4` also differ between curves, repeat
+`--sample MANIFEST K3 K4 CT3`.  The first selection must be the SM reference.
+The final 100,000-event rate-matched benchmarks are drawn with:
+
+```bash
+python3 scripts/plot_ct3_shapes.py \
+  --sample artifacts/lhe/14tev-ct3-sm-shapes/manifest.jsonl 1 1 0 \
+  --sample artifacts/lhe/14tev-ct3-rate-matched-production/manifest.jsonl 2.10 17 -0.20 \
+  --sample artifacts/lhe/14tev-ct3-k4zero-k3p1p9-production/manifest.jsonl 1.9 0 0.40 \
+  --output artifacts/figures/14tev-ct3-rate-matched-benchmarks \
+  --collider-label HL-LHC
+```
+
+This writes both normalized and absolute-bin-cross-section versions as
+`14tev-ct3-rate-matched-benchmarks.{pdf,png}` and
+`14tev-ct3-rate-matched-benchmarks-unnormalized.{pdf,png}`, together with a
+CSV summary of the selected samples and their inclusive rates.
+
+### Three-energy `kappa3t` rate parametrisation
+
+The publication-rate campaign extends the Eq. 9 polynomial at 13, 13.6, and
+14 TeV while fixing `CT1=CT2=0`.  With `x=k3-1`, `y=k4-1`, and `z=CT3`, the
+exact LO basis is
+
+```text
+1, x, x^2, x^3, x^4, y, x*y, x^2*y, y^2,
+z, x*z, x^2*z, y*z, z^2
+```
+
+The three tracked grids provide 15 zero-contact tensor points, 20 nonzero-CT3
+anchor points, and six independent validation points per energy.  The launcher
+uses PDF4LHC21_40 member 0 (LHAPDF ID 93100), MadGraph scale choice 4 with
+`scalefact=0.5` to obtain `muR=muF=m3h/2`, four 96-core workers, and 20,000
+events initially.  It stops after the zero-contact stage unless the SM rates
+and Eq. 9 dependence pass the reproduction gate.  Points with an integration
+error above 0.25% are automatically repeated with 100,000 events and
+independent seeds.
+
+Before the baseline grid, one 10-event SM smoke point at each energy verifies
+the PDF, scale, generated process, and manifest uncertainty field.  Set
+`SMOKE_ONLY=1` to stop after these three checks.
+
+Run the complete guarded workflow on Odysseus with:
+
+```bash
+cd /home/apapaefs/Projects/TripleHiggsTopEffects
+scripts/run_ct3_rate_fit_odysseus.sh
+```
+
+For a detached run:
+
+```bash
+screen -dmS hhh_ct3_rate_fit bash -lc \
+  'scripts/run_ct3_rate_fit_odysseus.sh > logs/ct3-rate-fit-launcher.log 2>&1'
+```
+
+Use `DRY_RUN=1` to inspect all 123 initial fit and validation configurations
+without creating workers.  Final outputs under `artifacts/fits/ct3-rate/`
+include LaTeX equations, JSON and CSV coefficients, covariance and correlation
+matrices, the Eq. 9 comparison, validation residuals, and PDF/PNG diagnostics.
+
+After the fit has been produced, generate the Run-2/HL-LHC
+`kappa3`--`kappa3t` and `kappa4`--`kappa3t` constraint plots with:
+
+```bash
+python3 scripts/plot_ct3_constraints.py
+```
+
+This reads `artifacts/fits/ct3-rate/coefficients.json` and writes PDF and PNG
+versions of both two-panel figures, together with
+`artifacts/figures/ct3-constraint-summary.json`.
 
 On a host such as `physres1.kennesaw.edu`, where `lhapdf-config` is already in
 `PATH` but the Tiresias Herwig module is unavailable, bypass the module load:
@@ -395,6 +627,7 @@ Common parallel-launcher overrides are:
 | `EVENTS` | `100000` | Events requested per point |
 | `TOTAL_CORES` | online CPU count | Machine-wide CPU-slot budget |
 | `EBEAM` | `6500` | Energy of each proton in GeV |
+| `CT1` | `0` | Anomalous top-Yukawa shift `c_t1`; zero gives `kappa_t=1` |
 | `CT2_POINTS` | `scans/ct2.13tev.csv` | `ct2` point grid |
 | `CT3_POINTS` | `scans/ct3.13tev.csv` | `ct3` point grid |
 | `SEED_START` | `13001` | First of the consecutive explicit point seeds |
@@ -417,6 +650,11 @@ Use a distinct `OUTPUT_DIR`, `WORK_DIR`, point name, or all three when changing
 physics settings.  A worker's resume validation includes the couplings, event
 count, beam energy, seed, PDF, dynamical scale, systematics choice, and survey
 splitting.
+
+For a large campaign where each loop-induced point benefits from a substantial
+MadGraph allocation, `run_parallel_scan.py --cores-per-point N` runs points in
+waves.  For example, `--total-cores 192 --cores-per-point 96` runs two points
+at a time and starts the next point whenever one completes.
 
 The launchers obtain the LHAPDF data, library, and Python paths from
 `lhapdf-config`.  Override the production event count with `EVENTS=N`; the

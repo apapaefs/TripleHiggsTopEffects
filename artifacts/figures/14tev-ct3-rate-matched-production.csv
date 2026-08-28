@@ -1,0 +1,4 @@
+ct3,k3,k4,run_name,events,cross_section_pb,cross_section_over_sm,lhe
+0,1,1,ct3_shape14_k3_p1_k4_p1_reference,100000,0.000043391,1,/home/apapaefs/Projects/TripleHiggsTopEffects/artifacts/lhe/14tev-ct3-sm-shapes/ct3_shape14_k3_p1_k4_p1_reference.unweighted_events.lhe.gz
+-0.20,2.10,17,ct3_production14_k3_p2p1_k4_p17_ct3_m0p2,100000,0.000043571,1.004148325689659145905833007,/home/apapaefs/Projects/TripleHiggsTopEffects/artifacts/lhe/14tev-ct3-rate-matched-production/ct3_production14_k3_p2p1_k4_p17_ct3_m0p2.unweighted_events.lhe.gz
+0.40,1.9,0,ct3_production14_k3_p1p9_k4_p0_ct3_p0p4,100000,0.000041744,0.9620428199396188149616279874,/home/apapaefs/Projects/TripleHiggsTopEffects/artifacts/lhe/14tev-ct3-k4zero-k3p1p9-production/ct3_production14_k3_p1p9_k4_p0_ct3_p0p4.unweighted_events.lhe.gz

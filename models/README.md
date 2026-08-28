@@ -2,7 +2,16 @@
 
 `heft_loop_sm_restricted5/` is the UFO used by this repository to generate
 loop-induced Higgs-pair and triple-Higgs matrix elements with the five
-couplings `D3`, `D4`, `CT1`, `CT2`, and `CT3`.
+anomalous inputs `D3`, `D4`, `CT1`, `CT2`, and `CT3`.
+
+The model contains ordinary SM `hhh` and `hhhh` vertices as well as additional
+vertices proportional to `D3` and `D4`.  Thus `D3` and `D4` are shifts:
+`k3=1+D3` and `k4=1+D4`; the SM point is `D3=D4=0`.  The campaign CSVs store
+the kappas, and `scripts/run_scan.py` subtracts one before writing LHA codes
+996 and 997.  The nonzero illustrative values retained in the UFO restriction
+card are not campaign defaults: MadGraph uses restriction values while
+constructing a process, and zeroing an input there can remove the associated
+anomalous vertex.  The campaign driver overwrites all five runtime card inputs.
 
 ## Provenance
 
@@ -13,9 +22,13 @@ git@gitlab.com:apapaefs/multihiggs_loop_sm.git
 commit 99ba5ee9066943a727f063099053604ea2e2f102
 ```
 
-The export retains the UFO Python source and restriction cards.  macOS
-AppleDouble files (`._*`) and editor swap files (`*.swp`) from the source
-checkout were excluded because they are not model inputs.
+The export retains the UFO Python source and restriction cards.  The sole
+campaign-specific default change is that `CT1` is initialized to zero in both
+`parameters.py` and `restrict_default.dat`: this is the SM top-Yukawa baseline
+because the model uses `kappa_t = 1 + CT1`.  The upstream snapshot's
+illustrative value was 1.3; no interaction or counterterm expression was
+changed.  macOS AppleDouble files (`._*`) and editor swap files (`*.swp`) from
+the source checkout were excluded because they are not model inputs.
 
 ## Reference
 

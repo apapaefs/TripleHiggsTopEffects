@@ -1,0 +1,4 @@
+# Verifies the shifted self-coupling convention at the full SM point.
+# The driver must write CT1=CT2=CT3=D3=D4=0 for this row.
+name,k3,k4,ct2
+smoke_corrected_k3_p1_k4_p1_reference,1,1,0

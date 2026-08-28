@@ -51,7 +51,7 @@ common_arguments=(
   --events "$events"
   --cores 1
   --ebeam 6500
-  --ct1 1
+  --ct1 0
   --pdlabel lhapdf
   --lhaid 331900
   --dynamical-scale-choice 3
@@ -69,7 +69,7 @@ if [[ "${SKIP_SMOKE:-0}" != 1 ]]; then
     --events "${SMOKE_EVENTS:-10}" \
     --cores 1 \
     --ebeam 6500 \
-    --ct1 1 \
+    --ct1 0 \
     --pdlabel lhapdf \
     --lhaid 331900 \
     --dynamical-scale-choice 3 \

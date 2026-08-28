@@ -1,0 +1,4 @@
+# 14 TeV pilot for the predicted SM-rate point with physical kappa_4=0.
+# The driver writes D3=k3-1=0.806 and D4=k4-1=-1.
+name,k3,k4,ct3
+rate14_k3_p1p806_k4_p0_ct3_p0p4,1.806,0,0.40

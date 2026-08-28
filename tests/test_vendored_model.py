@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from decimal import Decimal
 from pathlib import Path
 
 from scripts.prepare_process import DEFAULT_MODEL_SOURCE
@@ -52,6 +53,31 @@ class VendoredModelTests(unittest.TestCase):
                 start = text.index(f"{name} = Parameter(name = '{name}'")
                 block = text[start : start + 500]
                 self.assertIn(f"lhacode = [ {code} ]", block)
+
+    def test_ct1_input_default_is_sm_shift_zero(self) -> None:
+        parameters = (MODEL_DIR / "parameters.py").read_text(encoding="utf-8")
+        start = parameters.index("CT1 = Parameter(name = 'CT1'")
+        self.assertIn("value = 0.0", parameters[start : start + 300])
+
+        restriction = (MODEL_DIR / "restrict_default.dat").read_text(
+            encoding="utf-8"
+        )
+        ct1_line = next(
+            line for line in restriction.splitlines() if line.strip().startswith("993 ")
+        )
+        self.assertEqual(Decimal(ct1_line.split()[1]), Decimal("0"))
+
+    def test_self_coupling_inputs_are_shifts_on_top_of_sm_vertices(self) -> None:
+        couplings = (MODEL_DIR / "couplings.py").read_text(encoding="utf-8")
+        vertices = (MODEL_DIR / "vertices.py").read_text(encoding="utf-8")
+        self.assertIn("value = '-6*D3*complex(0,1)*lam*v'", couplings)
+        self.assertIn("value = '-6*D4*complex(0,1)*lam'", couplings)
+        self.assertIn("value = '-6*complex(0,1)*lam*v'", couplings)
+        self.assertIn("value = '-6*complex(0,1)*lam'", couplings)
+        self.assertIn("couplings = {(0,0):C.GC_HHH_MHEFT}", vertices)
+        self.assertIn("couplings = {(0,0):C.GC_HHHH_MHEFT}", vertices)
+        self.assertIn("couplings = {(0,0):C.GC_30}", vertices)
+        self.assertIn("couplings = {(0,0):C.GC_HHHH}", vertices)
 
     def test_filesystem_and_editor_artifacts_are_absent(self) -> None:
         names = [path.name for path in MODEL_DIR.iterdir()]

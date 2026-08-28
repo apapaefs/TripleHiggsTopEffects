@@ -1,0 +1,16 @@
+# Shape-focused 13 TeV scan in the near-SM-rate ct3 corridor.
+# k3/k4 are physical kappas: k3=k4=1 is written as UFO D3=D4=0.
+# CT1=0 (kappa_t=1) and CT2=0 are enforced by the campaign driver.
+name,k3,k4,ct3
+shape_k3_p1_k4_p1_ct3_m0p05,1,1,-0.05
+shape_k3_p1_k4_p1_ct3_m0p025,1,1,-0.025
+shape_k3_p1_k4_p1_reference,1,1,0
+shape_k3_p1_k4_p1_ct3_p0p025,1,1,0.025
+shape_k3_p1_k4_p1_ct3_p0p05,1,1,0.05
+shape_k3_p1_k4_p1_ct3_p0p075,1,1,0.075
+shape_k3_p1_k4_p1_ct3_p0p1,1,1,0.10
+shape_k3_p1_k4_p1_ct3_p0p125,1,1,0.125
+shape_k3_p1_k4_p1_ct3_p0p15,1,1,0.15
+shape_k3_p1_k4_p1_ct3_p0p18_rate_degenerate,1,1,0.18
+shape_k3_p1_k4_p1_ct3_p0p2,1,1,0.20
+shape_k3_p1_k4_p1_ct3_p0p25,1,1,0.25

@@ -28,6 +28,7 @@ if str(REPOSITORY_ROOT) not in sys.path:
 
 from scripts.run_scan import (  # noqa: E402
     CampaignError,
+    DEFAULT_CT1,
     ScanPoint,
     decimal_arg,
     load_points,
@@ -75,12 +76,24 @@ def available_cpu_slots() -> int:
         return os.cpu_count() or 1
 
 
-def allocate_core_slots(total_cores: int, task_count: int) -> tuple[list[int], int]:
+def allocate_core_slots(
+    total_cores: int,
+    task_count: int,
+    *,
+    cores_per_point: int | None = None,
+) -> tuple[list[int], int]:
     """Return per-task slots and the maximum number of concurrent tasks."""
     if total_cores <= 0:
         raise ValueError("total_cores must be positive")
     if task_count <= 0:
         raise ValueError("task_count must be positive")
+    if cores_per_point is not None:
+        if cores_per_point <= 0:
+            raise ValueError("cores_per_point must be positive")
+        if cores_per_point > total_cores:
+            raise ValueError("cores_per_point cannot exceed total_cores")
+        max_parallel = min(task_count, total_cores // cores_per_point)
+        return [cores_per_point] * task_count, max_parallel
     if task_count > total_cores:
         return [1] * task_count, total_cores
 
@@ -103,6 +116,24 @@ def load_campaign_points(
     if duplicates:
         raise CampaignError("duplicate run names: " + ", ".join(duplicates))
     return points
+
+
+def select_shards(
+    points: Sequence[ScanPoint], shard_count: int, shard_indices: Sequence[int]
+) -> list[ScanPoint]:
+    """Select deterministic, disjoint modulo shards from a canonical point list."""
+    if shard_count <= 0:
+        raise ValueError("shard_count must be positive")
+    selected = set(shard_indices)
+    if not selected:
+        raise ValueError("at least one shard index is required")
+    if len(selected) != len(shard_indices):
+        raise ValueError("shard indices must be unique")
+    if min(selected) < 0 or max(selected) >= shard_count:
+        raise ValueError("shard indices must be in [0, shard_count)")
+    return [
+        point for index, point in enumerate(points) if index % shard_count in selected
+    ]
 
 
 def process_signature(process_dir: Path) -> dict[str, str]:
@@ -281,8 +312,18 @@ def task_command(args: argparse.Namespace, task: ParallelTask) -> list[str]:
         command.extend(
             ["--dynamical-scale-choice", str(args.dynamical_scale_choice)]
         )
+    if args.scalefact is not None:
+        command.extend(["--scalefact", str(args.scalefact)])
     if args.use_systematics is not None:
         command.append("--systematics" if args.use_systematics else "--no-systematics")
+    if args.thermal_guard_wrapper is not None:
+        command = [
+            str(args.thermal_guard_wrapper),
+            args.thermal_guard_controller_script,
+            args.thermal_guard_controller_action,
+            "--",
+            *command,
+        ]
     return command
 
 
@@ -395,14 +436,41 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ct2-points", type=Path, action="append", default=[])
     parser.add_argument("--ct3-points", type=Path, action="append", default=[])
+    parser.add_argument(
+        "--shard-count",
+        type=int,
+        default=1,
+        help="split the canonical point list into this many modulo shards",
+    )
+    parser.add_argument(
+        "--shard-index",
+        type=int,
+        action="append",
+        dest="shard_indices",
+        help="select a zero-based shard; repeat to select multiple shards",
+    )
     parser.add_argument("--events", type=int, required=True)
     parser.add_argument("--total-cores", type=int, required=True)
+    parser.add_argument(
+        "--cores-per-point",
+        type=int,
+        help=(
+            "fixed slots for each point; points run in waves when their combined "
+            "allocation exceeds --total-cores"
+        ),
+    )
     parser.add_argument("--ebeam", type=decimal_arg, default=Decimal("6800"))
-    parser.add_argument("--ct1", type=decimal_arg, default=Decimal("1"))
+    parser.add_argument(
+        "--ct1",
+        type=decimal_arg,
+        default=DEFAULT_CT1,
+        help="anomalous top-Yukawa shift c_t1 (default: 0, so kappa_t=1)",
+    )
     parser.add_argument("--seed-start", type=int, default=13001)
     parser.add_argument("--pdlabel")
     parser.add_argument("--lhaid", type=int)
     parser.add_argument("--dynamical-scale-choice", type=int)
+    parser.add_argument("--scalefact", type=decimal_arg)
     systematics = parser.add_mutually_exclusive_group()
     systematics.add_argument(
         "--systematics", dest="use_systematics", action="store_const", const=True
@@ -422,17 +490,56 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--allow-oversubscription", action="store_true")
+    parser.add_argument(
+        "--thermal-guard-wrapper",
+        type=Path,
+        help=(
+            "wrapper used to leave a thermal-guard marker in each isolated "
+            "worker process group"
+        ),
+    )
+    parser.add_argument("--thermal-guard-controller-script")
+    parser.add_argument("--thermal-guard-controller-action")
     args = parser.parse_args()
     if args.events <= 0:
         parser.error("--events must be positive")
+    if args.shard_count <= 0:
+        parser.error("--shard-count must be positive")
+    if args.shard_indices is None:
+        args.shard_indices = [0]
+    if len(set(args.shard_indices)) != len(args.shard_indices):
+        parser.error("--shard-index values must be unique")
+    if any(index < 0 or index >= args.shard_count for index in args.shard_indices):
+        parser.error("--shard-index must be in [0, --shard-count)")
     if args.total_cores <= 0:
         parser.error("--total-cores must be positive")
+    if args.cores_per_point is not None and args.cores_per_point <= 0:
+        parser.error("--cores-per-point must be positive")
+    if (
+        args.cores_per_point is not None
+        and args.cores_per_point > args.total_cores
+    ):
+        parser.error("--cores-per-point cannot exceed --total-cores")
     if args.ebeam <= 0:
         parser.error("--ebeam must be positive")
+    if args.scalefact is not None and args.scalefact <= 0:
+        parser.error("--scalefact must be positive")
     if args.seed_start <= 0:
         parser.error("--seed-start must be positive for isolated parallel workers")
     if (args.pdlabel is None) != (args.lhaid is None):
         parser.error("--pdlabel and --lhaid must be supplied together")
+    thermal_guard_values = (
+        args.thermal_guard_wrapper,
+        args.thermal_guard_controller_script,
+        args.thermal_guard_controller_action,
+    )
+    if any(value is not None for value in thermal_guard_values) and not all(
+        value is not None for value in thermal_guard_values
+    ):
+        parser.error(
+            "--thermal-guard-wrapper, --thermal-guard-controller-script, and "
+            "--thermal-guard-controller-action must be supplied together"
+        )
     return args
 
 
@@ -442,8 +549,24 @@ def main() -> int:
     work_dir = args.work_dir.expanduser().resolve()
     output_dir = args.output_dir.expanduser().resolve()
     log_dir = args.log_dir.expanduser().resolve()
-    points = load_campaign_points(args.ct2_points, args.ct3_points)
-    allocations, max_parallel = allocate_core_slots(args.total_cores, len(points))
+    if args.thermal_guard_wrapper is not None:
+        args.thermal_guard_wrapper = args.thermal_guard_wrapper.expanduser().resolve()
+        if not args.thermal_guard_wrapper.is_file() or not os.access(
+            args.thermal_guard_wrapper, os.X_OK
+        ):
+            raise CampaignError(
+                "thermal-guard wrapper is not an executable file: "
+                f"{args.thermal_guard_wrapper}"
+            )
+    all_points = load_campaign_points(args.ct2_points, args.ct3_points)
+    points = select_shards(all_points, args.shard_count, args.shard_indices)
+    if not points:
+        raise CampaignError("selected shards contain no scan points")
+    allocations, max_parallel = allocate_core_slots(
+        args.total_cores,
+        len(points),
+        cores_per_point=args.cores_per_point,
+    )
     tasks = build_tasks(
         points,
         allocations,
@@ -463,20 +586,41 @@ def main() -> int:
         "work_dir": str(work_dir),
         "output_dir": str(output_dir),
         "events_per_point": args.events,
+        "all_point_count": len(all_points),
+        "selected_point_count": len(points),
+        "shard_count": args.shard_count,
+        "shard_indices": args.shard_indices,
         "beam_energy_per_proton_gev": str(args.ebeam),
+        "dynamical_scale_choice": args.dynamical_scale_choice,
+        "scalefact": str(args.scalefact) if args.scalefact is not None else None,
         "available_cpu_slots": available,
         "requested_cpu_slots": args.total_cores,
+        "cores_per_point": args.cores_per_point,
         "maximum_parallel_points": max_parallel,
         "seed_start": args.seed_start,
+        "thermal_guard": (
+            {
+                "wrapper": str(args.thermal_guard_wrapper),
+                "controller_script": args.thermal_guard_controller_script,
+                "controller_action": args.thermal_guard_controller_action,
+                "scope": "each isolated worker process group",
+            }
+            if args.thermal_guard_wrapper is not None
+            else None
+        ),
         "points": [
             {
                 "run_name": task.run_name,
                 "cores": task.cores,
                 "survey_splitting": task.cores,
                 "seed": task.seed,
+                "kappas": {
+                    name: str(value)
+                    for name, value in task.point.kappas().items()
+                },
                 "couplings": {
                     name: str(value)
-                    for name, value in task.point.couplings(args.ct1).items()
+                    for name, value in task.point.card_couplings(args.ct1).items()
                 },
             }
             for task in tasks
