@@ -28,6 +28,7 @@ pdlabel=${PDLABEL:-lhapdf}
 lhaid=${LHAID:-331900}
 pdf_set=${PDF_SET:-NNPDF40_lo_as_01180}
 scale_choice=${DYNAMICAL_SCALE_CHOICE:-3}
+scale_factor=${SCALEFACT:-}
 figure_output=${FIGURE_OUTPUT:-$repository_root/artifacts/figures/13tev-ct3-sm-shapes}
 collider_label=${COLLIDER_LABEL:-13 TeV}
 
@@ -106,6 +107,10 @@ fi
 scan_execution_arguments=()
 parallel_execution_arguments=()
 thermal_guard_arguments=()
+scale_arguments=()
+if [[ -n "$scale_factor" ]]; then
+  scale_arguments+=(--scalefact "$scale_factor")
+fi
 if [[ "${DRY_RUN:-0}" == 1 ]]; then
   scan_execution_arguments+=(--dry-run)
   parallel_execution_arguments+=(--dry-run)
@@ -146,6 +151,7 @@ if [[ "${SKIP_SMOKE:-0}" != 1 && "${PREPARE_ONLY:-0}" != 1 ]]; then
     --pdlabel "$pdlabel" \
     --lhaid "$lhaid" \
     --dynamical-scale-choice "$scale_choice" \
+    "${scale_arguments[@]}" \
     --no-systematics \
     --process-dir "$process_dir" \
     --output-dir "$smoke_output_dir" \
@@ -167,6 +173,7 @@ fi
   --pdlabel "$pdlabel" \
   --lhaid "$lhaid" \
   --dynamical-scale-choice "$scale_choice" \
+  "${scale_arguments[@]}" \
   --no-systematics \
   --process-dir "$process_dir" \
   --work-dir "$work_dir" \

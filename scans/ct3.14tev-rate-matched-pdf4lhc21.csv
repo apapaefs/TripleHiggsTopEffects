@@ -1,0 +1,6 @@
+# Final 14 TeV distribution samples using the inclusive-fit PDF and scale.
+# k3/k4 are physical kappas; the driver writes D3=k3-1 and D4=k4-1.
+name,k3,k4,ct3
+distribution14_pdf4lhc21_sm,1,1,0
+distribution14_pdf4lhc21_k3_p2p1_k4_p17_ct3_m0p2,2.10,17,-0.20
+distribution14_pdf4lhc21_k3_p1p9_k4_p0_ct3_p0p4,1.9,0,0.40

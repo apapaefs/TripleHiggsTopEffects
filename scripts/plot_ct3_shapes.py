@@ -23,6 +23,9 @@ DEFAULT_MANIFEST = (
 DEFAULT_OUTPUT = REPOSITORY_ROOT / "artifacts/figures/14tev-ct3-sm-shapes"
 SM_ZERO = Decimal("0")
 SM_ONE = Decimal("1")
+SHAPE_BIN_WIDTH_GEV = 40.0
+SHAPE_RANGE_QUANTILE = 0.995
+MIN_PLOTTED_WEIGHT_FRACTION = 0.995
 
 
 class PlotError(RuntimeError):
@@ -38,6 +41,11 @@ class ManifestSample:
     cross_section_pb: Decimal
     generated_events: int
     lhe: Path
+    pdlabel: str | None
+    lhaid: int | None
+    dynamical_scale_choice: int | None
+    scalefact: Decimal | None
+    beam_energy_gev: Decimal | None
 
 
 @dataclass(frozen=True)
@@ -146,6 +154,32 @@ def load_manifest_samples(
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise PlotError(f"{run_name}: incomplete manifest record") from exc
+        if generated_events <= 0 or cross_section_pb <= 0:
+            raise PlotError(f"{run_name}: non-positive event count or cross section")
+
+        pdlabel_value = record.get("pdlabel")
+        pdlabel = str(pdlabel_value) if pdlabel_value is not None else None
+        try:
+            lhaid = int(record["lhaid"]) if record.get("lhaid") is not None else None
+            dynamical_scale_choice = (
+                int(record["dynamical_scale_choice"])
+                if record.get("dynamical_scale_choice") is not None
+                else None
+            )
+            scalefact = (
+                parse_decimal(record["scalefact"], context=f"{run_name}.scalefact")
+                if record.get("scalefact") is not None
+                else None
+            )
+            beam_energy_gev = (
+                parse_decimal(
+                    record["beam_energy_gev"], context=f"{run_name}.beam_energy_gev"
+                )
+                if record.get("beam_energy_gev") is not None
+                else None
+            )
+        except (TypeError, ValueError) as exc:
+            raise PlotError(f"{run_name}: malformed generation settings") from exc
         by_ct3[ct3] = ManifestSample(
             run_name=run_name,
             ct3=ct3,
@@ -154,6 +188,11 @@ def load_manifest_samples(
             cross_section_pb=cross_section_pb,
             generated_events=generated_events,
             lhe=lhe.resolve(),
+            pdlabel=pdlabel,
+            lhaid=lhaid,
+            dynamical_scale_choice=dynamical_scale_choice,
+            scalefact=scalefact,
+            beam_energy_gev=beam_energy_gev,
         )
 
     missing = [value for value in requested_ct3 if value not in by_ct3]
@@ -226,6 +265,8 @@ def read_event_shapes(path: Path) -> EventShapes:
     sum_pt_h: list[float] = []
     weights: list[float] = []
     for event_number, (weight, higgs) in enumerate(iter_lhe_events(path), start=1):
+        if not math.isfinite(weight):
+            raise PlotError(f"{path}: event {event_number} has a non-finite weight")
         if len(higgs) != 3:
             raise PlotError(
                 f"{path}: event {event_number} has {len(higgs)} final-state Higgs "
@@ -235,6 +276,8 @@ def read_event_shapes(path: Path) -> EventShapes:
         py = sum(momentum[1] for momentum in higgs)
         pz = sum(momentum[2] for momentum in higgs)
         energy = sum(momentum[3] for momentum in higgs)
+        if not all(math.isfinite(value) for momentum in higgs for value in momentum):
+            raise PlotError(f"{path}: event {event_number} has non-finite momentum")
         mass_squared = energy * energy - px * px - py * py - pz * pz
         if mass_squared < -1e-5:
             raise PlotError(
@@ -276,6 +319,59 @@ def absolute_bin_cross_sections(
     return normalized_bin_weights(values, weights, edges) * float(cross_section_pb)
 
 
+def weighted_quantile(
+    values: Iterable[float], weights: Iterable[float], quantile: float
+) -> float:
+    """Return a quantile using the event weights as a discrete probability mass."""
+    import numpy as np
+
+    if not 0.0 <= quantile <= 1.0:
+        raise PlotError(f"quantile must lie in [0, 1], got {quantile}")
+    value_array = np.asarray(tuple(values), dtype=float)
+    weight_array = np.asarray(tuple(weights), dtype=float)
+    if value_array.size == 0 or value_array.shape != weight_array.shape:
+        raise PlotError("weighted quantile requires equally sized, non-empty inputs")
+    if not np.all(np.isfinite(value_array)) or not np.all(np.isfinite(weight_array)):
+        raise PlotError("weighted quantile inputs must be finite")
+    if np.any(weight_array < 0.0):
+        raise PlotError("adaptive plot ranges require non-negative event weights")
+    total_weight = float(weight_array.sum())
+    if total_weight <= 0.0:
+        raise PlotError("weighted quantile requires positive total event weight")
+
+    order = np.argsort(value_array, kind="stable")
+    sorted_values = value_array[order]
+    cumulative_weight = np.cumsum(weight_array[order])
+    target = quantile * total_weight
+    index = int(np.searchsorted(cumulative_weight, target, side="left"))
+    return float(sorted_values[min(index, sorted_values.size - 1)])
+
+
+def adaptive_upper_edge(
+    value_weight_pairs: Iterable[tuple[Iterable[float], Iterable[float]]],
+    *,
+    lower_edge: float,
+    bin_width: float = SHAPE_BIN_WIDTH_GEV,
+    quantile: float = SHAPE_RANGE_QUANTILE,
+    rounding_step: float = 200.0,
+) -> float:
+    """Choose a reproducible upper edge containing the requested weighted tail."""
+    if bin_width <= 0.0 or rounding_step <= 0.0:
+        raise PlotError("plot bin width and range-rounding step must be positive")
+    pairs = list(value_weight_pairs)
+    if not pairs:
+        raise PlotError("cannot choose a plot range without samples")
+    largest_quantile = max(
+        weighted_quantile(values, weights, quantile) for values, weights in pairs
+    )
+    upper_edge = math.ceil(largest_quantile / rounding_step) * rounding_step
+    upper_edge = max(upper_edge, lower_edge + bin_width)
+    # Keep every edge aligned to the histogram width even if callers change the
+    # coarser rounding step in the future.
+    bin_count = math.ceil((upper_edge - lower_edge) / bin_width)
+    return lower_edge + bin_count * bin_width
+
+
 def sample_label(ct3: Decimal, k3: Decimal, k4: Decimal) -> str:
     """Label a curve without repeating self-couplings fixed to their SM values."""
     if ct3 == SM_ZERO and k3 == SM_ONE and k4 == SM_ONE:
@@ -289,6 +385,53 @@ def sample_label(ct3: Decimal, k3: Decimal, k4: Decimal) -> str:
     return "$" + r",\quad ".join(entries) + "$"
 
 
+def validate_sample_settings(
+    samples: Sequence[ManifestSample],
+    *,
+    expected_pdlabel: str | None = None,
+    expected_lhaid: int | None = None,
+    expected_dynamical_scale_choice: int | None = None,
+    expected_scalefact: Decimal | None = None,
+    expected_beam_energy_gev: Decimal | None = None,
+) -> None:
+    """Require a common generation setup and any explicitly requested settings."""
+    if not samples:
+        raise PlotError("no samples were selected")
+    attributes = (
+        "pdlabel",
+        "lhaid",
+        "dynamical_scale_choice",
+        "scalefact",
+        "beam_energy_gev",
+    )
+    reference = samples[0]
+    for sample in samples[1:]:
+        mismatches = [
+            attribute
+            for attribute in attributes
+            if getattr(sample, attribute) != getattr(reference, attribute)
+        ]
+        if mismatches:
+            raise PlotError(
+                f"{sample.run_name}: generation settings differ from "
+                f"{reference.run_name}: {', '.join(mismatches)}"
+            )
+
+    expectations = {
+        "pdlabel": expected_pdlabel,
+        "lhaid": expected_lhaid,
+        "dynamical_scale_choice": expected_dynamical_scale_choice,
+        "scalefact": expected_scalefact,
+        "beam_energy_gev": expected_beam_energy_gev,
+    }
+    for attribute, expected in expectations.items():
+        if expected is not None and getattr(reference, attribute) != expected:
+            raise PlotError(
+                f"expected {attribute}={expected}, but manifest records "
+                f"{getattr(reference, attribute)}"
+            )
+
+
 def write_summary(
     path: Path,
     samples: Sequence[ManifestSample],
@@ -296,7 +439,7 @@ def write_summary(
 ) -> None:
     sm_cross_section = samples[0].cross_section_pb
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.writer(handle)
+        writer = csv.writer(handle, lineterminator="\n")
         writer.writerow(
             [
                 "ct3",
@@ -306,6 +449,11 @@ def write_summary(
                 "events",
                 "cross_section_pb",
                 "cross_section_over_sm",
+                "pdlabel",
+                "lhaid",
+                "dynamical_scale_choice",
+                "scalefact",
+                "beam_energy_gev",
                 "lhe",
             ]
         )
@@ -319,6 +467,15 @@ def write_summary(
                     event_shapes.event_count,
                     str(sample.cross_section_pb),
                     str(sample.cross_section_pb / sm_cross_section),
+                    sample.pdlabel,
+                    sample.lhaid,
+                    sample.dynamical_scale_choice,
+                    str(sample.scalefact) if sample.scalefact is not None else "",
+                    (
+                        str(sample.beam_energy_gev)
+                        if sample.beam_energy_gev is not None
+                        else ""
+                    ),
                     str(sample.lhe),
                 ]
             )
@@ -329,7 +486,11 @@ def plot_shapes(
     shapes: Sequence[EventShapes],
     output: Path,
     collider_label: str,
-) -> tuple[Path, Path, Path, Path, Path]:
+) -> tuple[Path, Path, Path, Path, Path, Path]:
+    if not samples or len(samples) != len(shapes):
+        raise PlotError(
+            "plotting requires one non-empty event sample per manifest record"
+        )
     cache = Path(tempfile.gettempdir()) / f"triple-higgs-mpl-{os.getuid()}"
     cache.mkdir(parents=True, exist_ok=True)
     os.environ.setdefault("MPLCONFIGDIR", str(cache))
@@ -341,8 +502,25 @@ def plot_shapes(
     import numpy as np
 
     output.parent.mkdir(parents=True, exist_ok=True)
-    m3h_edges = np.arange(400.0, 1200.0 + 40.0, 40.0)
-    sum_pt_edges = np.arange(0.0, 1200.0 + 40.0, 40.0)
+    m3h_lower = 360.0
+    sum_pt_lower = 0.0
+    m3h_upper = adaptive_upper_edge(
+        ((event_shapes.m3h, event_shapes.weights) for event_shapes in shapes),
+        lower_edge=m3h_lower,
+    )
+    sum_pt_upper = adaptive_upper_edge(
+        (
+            (event_shapes.sum_pt_h, event_shapes.weights)
+            for event_shapes in shapes
+        ),
+        lower_edge=sum_pt_lower,
+    )
+    m3h_edges = np.arange(
+        m3h_lower, m3h_upper + SHAPE_BIN_WIDTH_GEV, SHAPE_BIN_WIDTH_GEV
+    )
+    sum_pt_edges = np.arange(
+        sum_pt_lower, sum_pt_upper + SHAPE_BIN_WIDTH_GEV, SHAPE_BIN_WIDTH_GEV
+    )
     styles = (
         {"color": "black", "linestyle": "-", "linewidth": 1.6},
         {"color": "#d62728", "linestyle": "--", "linewidth": 1.6},
@@ -385,6 +563,59 @@ def plot_shapes(
         for sample, event_shapes in zip(samples, shapes)
     ]
 
+    validation_records = []
+    for sample, event_shapes, normalized, absolute in zip(
+        samples, shapes, normalized_histograms, absolute_histograms
+    ):
+        if event_shapes.event_count != sample.generated_events:
+            raise PlotError(
+                f"{sample.run_name}: manifest records {sample.generated_events} "
+                f"events but the LHE contains {event_shapes.event_count}"
+            )
+        observables = {}
+        for name, normalized_histogram, absolute_histogram in zip(
+            ("m3h", "sum_pt_h"), normalized, absolute
+        ):
+            if not np.all(np.isfinite(normalized_histogram)) or not np.all(
+                np.isfinite(absolute_histogram)
+            ):
+                raise PlotError(f"{sample.run_name}: non-finite histogram bin")
+            if np.any(normalized_histogram < -1e-14) or np.any(
+                absolute_histogram < -1e-14
+            ):
+                raise PlotError(f"{sample.run_name}: negative histogram bin")
+            expected_absolute = normalized_histogram * float(sample.cross_section_pb)
+            if not np.allclose(
+                absolute_histogram, expected_absolute, rtol=1e-12, atol=1e-15
+            ):
+                raise PlotError(f"{sample.run_name}: absolute histogram closure failed")
+            coverage = float(normalized_histogram.sum())
+            if coverage < -1e-12 or coverage > 1.0 + 1e-12:
+                raise PlotError(f"{sample.run_name}: invalid plotted-weight coverage")
+            if coverage + 1e-12 < MIN_PLOTTED_WEIGHT_FRACTION:
+                raise PlotError(
+                    f"{sample.run_name}: only {coverage:.3%} of the {name} "
+                    f"distribution lies inside the plotted range"
+                )
+            observables[name] = {
+                "normalized_bin_sum": coverage,
+                "outside_range_fraction": 1.0 - coverage,
+                "absolute_bin_sum_pb": float(absolute_histogram.sum()),
+                "maximum_closure_error_pb": float(
+                    np.max(np.abs(absolute_histogram - expected_absolute))
+                ),
+            }
+        validation_records.append(
+            {
+                "run_name": sample.run_name,
+                "events": event_shapes.event_count,
+                "manifest_events": sample.generated_events,
+                "total_event_weight": float(sum(event_shapes.weights)),
+                "cross_section_pb": float(sample.cross_section_pb),
+                "observables": observables,
+            }
+        )
+
     def render(*, absolute: bool, destination: Path) -> tuple[Path, Path]:
         figure, axes = plt.subplots(1, 2, figsize=(8.2, 3.65))
         plotted: list[tuple[object, object]] = []
@@ -415,10 +646,10 @@ def plot_shapes(
             axis.set_yscale("log")
             axis.tick_params(which="both", direction="in", top=True, right=True)
             axis.minorticks_on()
-            axis.legend(frameon=False, fontsize=9, loc="lower left")
-        axes[0].set_xlim(400, 1200)
+            axis.legend(frameon=False, fontsize=8.5, loc="upper right")
+        axes[0].set_xlim(m3h_lower, m3h_upper)
         axes[0].set_xlabel(r"$m_{3h}\;[\mathrm{GeV}]$")
-        axes[1].set_xlim(0, 1200)
+        axes[1].set_xlim(sum_pt_lower, sum_pt_upper)
         axes[1].set_xlabel(r"$\sum p_{T,h}\;[\mathrm{GeV}]$")
 
         if absolute:
@@ -439,18 +670,24 @@ def plot_shapes(
                 r"\;[\mathrm{pb}/(40\,\mathrm{GeV})]$"
             )
         else:
-            axes[0].set_ylim(8e-4, 3e-1)
+            for axis_index, axis in enumerate(axes):
+                positive = [
+                    float(value)
+                    for histograms in plotted
+                    for value in histograms[axis_index]
+                    if value > 0
+                ]
+                axis.set_ylim(min(positive) * 0.7, max(positive) * 1.8)
             axes[0].set_ylabel(
                 r"$1/\sigma\,\mathrm{d}\sigma/\mathrm{d}m_{3h}"
                 r"\;[1/(40\,\mathrm{GeV})]$"
             )
-            axes[1].set_ylim(3e-5, 3e-1)
             axes[1].set_ylabel(
                 r"$1/\sigma\,\mathrm{d}\sigma/\mathrm{d}\sum p_{T,h}"
                 r"\;[1/(40\,\mathrm{GeV})]$"
             )
 
-        # Leave enough room for the centered 1200 tick label on the right.
+        # Leave enough room for the centered final tick labels on the right.
         figure.subplots_adjust(
             left=0.105, right=0.965, bottom=0.17, top=0.89, wspace=0.30
         )
@@ -468,12 +705,51 @@ def plot_shapes(
     )
     summary = output.with_suffix(".csv")
     write_summary(summary, samples, shapes)
+    validation = output.with_name(f"{output.name}-validation.json")
+    validation.write_text(
+        json.dumps(
+            {
+                "checks_passed": True,
+                "common_settings": {
+                    "pdlabel": samples[0].pdlabel,
+                    "lhaid": samples[0].lhaid,
+                    "dynamical_scale_choice": samples[0].dynamical_scale_choice,
+                    "scalefact": (
+                        str(samples[0].scalefact)
+                        if samples[0].scalefact is not None
+                        else None
+                    ),
+                    "beam_energy_gev": (
+                        str(samples[0].beam_energy_gev)
+                        if samples[0].beam_energy_gev is not None
+                        else None
+                    ),
+                },
+                "binning_gev": {
+                    "m3h": list(map(float, m3h_edges)),
+                    "sum_pt_h": list(map(float, sum_pt_edges)),
+                },
+                "range_policy": {
+                    "weighted_quantile": SHAPE_RANGE_QUANTILE,
+                    "minimum_plotted_weight_fraction": (
+                        MIN_PLOTTED_WEIGHT_FRACTION
+                    ),
+                    "bin_width_gev": SHAPE_BIN_WIDTH_GEV,
+                },
+                "samples": validation_records,
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     return (
         normalized_pdf,
         normalized_png,
         unnormalized_pdf,
         unnormalized_png,
         summary,
+        validation,
     )
 
 
@@ -514,6 +790,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--collider-label", default="HL-LHC")
+    parser.add_argument("--expected-pdlabel")
+    parser.add_argument("--expected-lhaid", type=int)
+    parser.add_argument("--expected-dynamical-scale-choice", type=int)
+    parser.add_argument("--expected-scalefact", type=decimal_argument)
+    parser.add_argument("--expected-beam-energy-gev", type=decimal_argument)
     parser.add_argument(
         "--k3",
         type=decimal_argument,
@@ -587,6 +868,14 @@ def main() -> int:
         samples = load_manifest_samples(
             manifest, args.ct3_values, args.k3, args.k4
         )
+    validate_sample_settings(
+        samples,
+        expected_pdlabel=args.expected_pdlabel,
+        expected_lhaid=args.expected_lhaid,
+        expected_dynamical_scale_choice=args.expected_dynamical_scale_choice,
+        expected_scalefact=args.expected_scalefact,
+        expected_beam_energy_gev=args.expected_beam_energy_gev,
+    )
     shapes: list[EventShapes] = []
     for sample in samples:
         print(f"Reading {sample.run_name}: {sample.lhe}", flush=True)

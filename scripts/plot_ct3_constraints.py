@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
 
@@ -24,6 +26,19 @@ K4_UNITARITY_BOUND = 64.8933
 
 class ConstraintPlotError(RuntimeError):
     """A user-actionable fit or plotting error."""
+
+
+@dataclass(frozen=True)
+class LimitEllipse:
+    """Axis-aligned bounds of the kappa4--kappa3t rate-limit ellipse."""
+
+    center_k4: float
+    center_k3t: float
+    minimum_ratio: float
+    k4_min: float
+    k4_max: float
+    k3t_min: float
+    k3t_max: float
 
 
 def load_coefficients(path: Path) -> dict[str, dict[str, float]]:
@@ -99,6 +114,63 @@ def rate_degenerate_k3t(coefficients: Mapping[str, float]) -> float:
     return -coefficients["d00"] / coefficients["e00"]
 
 
+def k4_k3t_limit_ellipse(
+    coefficients: Mapping[str, float], signal_strength_limit: float
+) -> LimitEllipse:
+    """Return the exact bounds of R(kappa3=1)=signal_strength_limit."""
+    a = coefficients["c02"]
+    b = coefficients["d01"]
+    c = coefficients["e00"]
+    p = coefficients["c01"]
+    q = coefficients["d00"]
+    determinant = 4.0 * a * c - b * b
+    if a <= 0.0 or c <= 0.0 or determinant <= 0.0:
+        raise ConstraintPlotError("the kappa4--kappa3t contour is not an ellipse")
+
+    center_y = (b * q - 2.0 * c * p) / determinant
+    center_k3t = (b * p - 2.0 * a * q) / determinant
+    minimum_ratio = (
+        coefficients["c00"]
+        + p * center_y
+        + q * center_k3t
+        + a * center_y**2
+        + b * center_y * center_k3t
+        + c * center_k3t**2
+    )
+    delta = signal_strength_limit - minimum_ratio
+    if delta <= 0.0:
+        raise ConstraintPlotError("the requested rate limit does not enclose the minimum")
+
+    quadratic_determinant = a * c - 0.25 * b * b
+    k4_extent = math.sqrt(delta * c / quadratic_determinant)
+    k3t_extent = math.sqrt(delta * a / quadratic_determinant)
+    center_k4 = center_y + 1.0
+    return LimitEllipse(
+        center_k4=center_k4,
+        center_k3t=center_k3t,
+        minimum_ratio=minimum_ratio,
+        k4_min=center_k4 - k4_extent,
+        k4_max=center_k4 + k4_extent,
+        k3t_min=center_k3t - k3t_extent,
+        k3t_max=center_k3t + k3t_extent,
+    )
+
+
+def padded_symmetric_range(
+    lower: float,
+    upper: float,
+    *,
+    padding_fraction: float = 0.08,
+    quantum: float = 0.5,
+) -> tuple[float, float]:
+    """Build a symmetric plotting range with rounded outward padding."""
+    if not lower < upper or padding_fraction < 0.0 or quantum <= 0.0:
+        raise ValueError("invalid axis-range parameters")
+    magnitude = max(abs(lower), abs(upper)) * (1.0 + padding_fraction)
+    rounded = math.ceil(magnitude / quantum) * quantum
+    return -rounded, rounded
+
+
 def plot_plane(
     *,
     coefficients_by_energy: Mapping[str, Mapping[str, float]],
@@ -129,9 +201,10 @@ def plot_plane(
         raise ConstraintPlotError(f"unsupported plane: {horizontal_coupling}")
 
     panels = (
-        ("13", "LHC Run 2", 588.0, (-8.0, 8.0)),
-        ("14", "HL-LHC", 125.0, (-4.0, 4.0)),
+        ("13", "LHC Run 2", 588.0),
+        ("14", "HL-LHC", 125.0),
     )
+    k3_vertical_ranges = {"13": (-8.0, 8.0), "14": (-4.0, 4.0)}
     red = "#c9252d"
     yellow = "#f3d44e"
     plt.rcParams.update(
@@ -144,7 +217,16 @@ def plot_plane(
     )
     figure, axes = plt.subplots(1, 2, figsize=(8.2, 3.7))
     for axis, panel, horizontal_range in zip(axes, panels, horizontal_ranges):
-        energy, title, signal_strength_limit, vertical_range = panel
+        energy, title, signal_strength_limit = panel
+        if horizontal_coupling == "k4":
+            ellipse = k4_k3t_limit_ellipse(
+                coefficients_by_energy[energy], signal_strength_limit
+            )
+            vertical_range = padded_symmetric_range(
+                ellipse.k3t_min, ellipse.k3t_max
+            )
+        else:
+            vertical_range = k3_vertical_ranges[energy]
         horizontal = np.linspace(*horizontal_range, 901)
         k3t = np.linspace(*vertical_range, 901)
         horizontal_grid, k3t_grid = np.meshgrid(horizontal, k3t)
@@ -227,6 +309,10 @@ def write_summary(
     coefficients_by_energy: Mapping[str, Mapping[str, float]],
 ) -> None:
     limits = {"13": 588.0, "14": 125.0}
+    ellipses = {
+        energy: k4_k3t_limit_ellipse(coefficients_by_energy[energy], limits[energy])
+        for energy in limits
+    }
     payload = {
         "fit": str(fit_path.resolve()),
         "convention": {
@@ -251,6 +337,19 @@ def write_summary(
                 ),
             }
             for energy in limits
+        },
+        "kappa4_kappa3t_limit_ellipse": {
+            energy: {
+                "signal_strength_limit": limits[energy],
+                "center": [ellipse.center_k4, ellipse.center_k3t],
+                "minimum_ratio": ellipse.minimum_ratio,
+                "kappa4_bounds": [ellipse.k4_min, ellipse.k4_max],
+                "kappa3t_bounds": [ellipse.k3t_min, ellipse.k3t_max],
+                "plot_kappa3t_range": list(
+                    padded_symmetric_range(ellipse.k3t_min, ellipse.k3t_max)
+                ),
+            }
+            for energy, ellipse in ellipses.items()
         },
     }
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")

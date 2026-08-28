@@ -494,13 +494,29 @@ python3 scripts/plot_ct3_shapes.py \
 
 For a comparison in which `k3` and `k4` also differ between curves, repeat
 `--sample MANIFEST K3 K4 CT3`.  The first selection must be the SM reference.
-The final 100,000-event rate-matched benchmarks are drawn with:
+The publication benchmarks are regenerated with the same setup as the rate
+fit: PDF4LHC21_40 member 0 (LHAPDF ID 93100), MadGraph scale choice 4, and
+`scalefact=0.5`, corresponding to `muR=muF=m3h/2`.  Launch the guarded
+100,000-event production with:
+
+```bash
+screen -dmS hhh_ct3_pdf4_shapes bash -lc \
+  'scripts/run_14tev_ct3_rate_matched_pdf4lhc21_odysseus.sh > logs/14tev-ct3-rate-matched-pdf4lhc21-launcher.log 2>&1'
+```
+
+The launcher plots the three completed samples automatically.  To reproduce
+only that plotting step, run:
 
 ```bash
 python3 scripts/plot_ct3_shapes.py \
-  --sample artifacts/lhe/14tev-ct3-sm-shapes/manifest.jsonl 1 1 0 \
-  --sample artifacts/lhe/14tev-ct3-rate-matched-production/manifest.jsonl 2.10 17 -0.20 \
-  --sample artifacts/lhe/14tev-ct3-k4zero-k3p1p9-production/manifest.jsonl 1.9 0 0.40 \
+  --sample artifacts/lhe/14tev-ct3-rate-matched-pdf4lhc21/manifest.jsonl 1 1 0 \
+  --sample artifacts/lhe/14tev-ct3-rate-matched-pdf4lhc21/manifest.jsonl 2.10 17 -0.20 \
+  --sample artifacts/lhe/14tev-ct3-rate-matched-pdf4lhc21/manifest.jsonl 1.9 0 0.40 \
+  --expected-pdlabel lhapdf \
+  --expected-lhaid 93100 \
+  --expected-dynamical-scale-choice 4 \
+  --expected-scalefact 0.5 \
+  --expected-beam-energy-gev 7000 \
   --output artifacts/figures/14tev-ct3-rate-matched-benchmarks \
   --collider-label HL-LHC
 ```
@@ -508,7 +524,11 @@ python3 scripts/plot_ct3_shapes.py \
 This writes both normalized and absolute-bin-cross-section versions as
 `14tev-ct3-rate-matched-benchmarks.{pdf,png}` and
 `14tev-ct3-rate-matched-benchmarks-unnormalized.{pdf,png}`, together with a
-CSV summary of the selected samples and their inclusive rates.
+CSV summary of the selected samples and their inclusive rates.  Plot ranges
+are rounded from the largest weighted 99.5th percentile across the samples;
+the accompanying `14tev-ct3-rate-matched-benchmarks-validation.json` records
+the binning, common generation settings, plotted coverage, and normalized-to-
+absolute histogram closure checks.
 
 ### Three-energy `kappa3t` rate parametrisation
 

@@ -1,0 +1,3 @@
+# Independent smoke test for the PDF4LHC21_40, m3h/2 distribution campaign.
+name,k3,k4,ct3
+distribution14_pdf4lhc21_smoke,1,1,0

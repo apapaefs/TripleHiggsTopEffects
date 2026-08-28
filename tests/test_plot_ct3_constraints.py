@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import unittest
 
+from scripts.fit_ct3_rate import BASIS_NAMES, basis_vector
 from scripts.plot_ct3_constraints import (
     cross_section_ratio,
+    k4_k3t_limit_ellipse,
+    padded_symmetric_range,
     rate_degenerate_k3t,
     single_parameter_k3t_interval,
 )
@@ -55,6 +58,47 @@ class ConstraintPlotTests(unittest.TestCase):
         self.assertAlmostEqual(
             cross_section_ratio(COEFFICIENTS, 1.0, 1.0, upper), 125.0
         )
+
+    def test_plot_polynomial_matches_fit_basis(self) -> None:
+        coefficients = [COEFFICIENTS[name] for name in BASIS_NAMES]
+        for k3, k4, k3t in ((1.0, 1.0, 0.0), (2.1, 17.0, -0.2), (1.9, 0.0, 0.4)):
+            expected = float(basis_vector(k3, k4, k3t) @ coefficients)
+            self.assertAlmostEqual(
+                cross_section_ratio(COEFFICIENTS, k3, k4, k3t), expected
+            )
+
+    def test_k4_k3t_ellipse_bounds_end_on_limit(self) -> None:
+        limit = 125.0
+        ellipse = k4_k3t_limit_ellipse(COEFFICIENTS, limit)
+        for k3t in (ellipse.k3t_min, ellipse.k3t_max):
+            y_at_fixed_k3t_minimum = -(
+                COEFFICIENTS["c01"] + COEFFICIENTS["d01"] * k3t
+            ) / (2.0 * COEFFICIENTS["c02"])
+            self.assertAlmostEqual(
+                cross_section_ratio(
+                    COEFFICIENTS, 1.0, y_at_fixed_k3t_minimum + 1.0, k3t
+                ),
+                limit,
+                places=10,
+            )
+        for k4 in (ellipse.k4_min, ellipse.k4_max):
+            y = k4 - 1.0
+            k3t_at_fixed_k4_minimum = -(
+                COEFFICIENTS["d00"] + COEFFICIENTS["d01"] * y
+            ) / (2.0 * COEFFICIENTS["e00"])
+            self.assertAlmostEqual(
+                cross_section_ratio(
+                    COEFFICIENTS, 1.0, k4, k3t_at_fixed_k4_minimum
+                ),
+                limit,
+                places=10,
+            )
+
+    def test_padded_range_contains_complete_ellipse(self) -> None:
+        ellipse = k4_k3t_limit_ellipse(COEFFICIENTS, 125.0)
+        lower, upper = padded_symmetric_range(ellipse.k3t_min, ellipse.k3t_max)
+        self.assertLess(lower, ellipse.k3t_min)
+        self.assertGreater(upper, ellipse.k3t_max)
 
 
 if __name__ == "__main__":
