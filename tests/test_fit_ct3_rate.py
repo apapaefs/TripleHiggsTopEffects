@@ -11,6 +11,8 @@ from scripts.fit_ct3_rate import (
     basis_vector,
     combine_replicates,
     draft_ratio,
+    eq9_coefficient_values,
+    eq9_ratio_from_coefficients,
     fit_points,
 )
 
@@ -23,6 +25,39 @@ class PolynomialBasisTests(unittest.TestCase):
     def test_draft_ratio_is_normalized_at_the_sm(self) -> None:
         for energy in ("13", "13.6", "14"):
             self.assertAlmostEqual(draft_ratio(energy, 1.0, 1.0), 1.0)
+
+    def test_eq9_coefficient_form_is_exactly_equivalent_to_basis(self) -> None:
+        normalized = np.asarray(
+            [
+                1.0,
+                -0.8,
+                0.9,
+                -0.25,
+                0.04,
+                -0.09,
+                -0.16,
+                0.05,
+                0.017,
+                -2.9,
+                -3.9,
+                0.9,
+                0.8,
+                16.0,
+            ]
+        )
+        for k3, k4, k3t in (
+            (1.0, 1.0, 0.0),
+            (2.1, 17.0, -0.2),
+            (-2.0, -25.0, 1.5),
+        ):
+            direct = float(basis_vector(k3, k4, k3t) @ normalized)
+            regrouped = eq9_ratio_from_coefficients(k3, k4, k3t, normalized)
+            self.assertAlmostEqual(regrouped, direct, places=12)
+
+        functions = eq9_coefficient_values(normalized, 0.5)
+        self.assertAlmostEqual(functions["c00"], 1.0 - 2.9 * 0.5 + 16.0 * 0.25)
+        self.assertAlmostEqual(functions["c10"], -0.8 - 3.9 * 0.5)
+        self.assertAlmostEqual(functions["c01"], -0.09 + 0.8 * 0.5)
 
     def test_publication_grid_has_full_rank_and_recovers_coefficients(self) -> None:
         normalized = np.asarray(

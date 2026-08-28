@@ -92,6 +92,33 @@ LATEX_MONOMIALS = (
     "z^2",
 )
 
+# Regroup the exact rate basis into the same coefficient-function form used
+# by Eq. (9): sum_{n,m} c_nm(z) (Delta kappa_3)^n (Delta kappa_4)^m.
+# Each tuple contains (basis index, power of z).
+EQ9_COEFFICIENT_TERMS = (
+    ("c00", ((0, 0), (9, 1), (13, 2))),
+    ("c01", ((5, 0), (12, 1))),
+    ("c02", ((8, 0),)),
+    ("c10", ((1, 0), (10, 1))),
+    ("c11", ((6, 0),)),
+    ("c20", ((2, 0), (11, 1))),
+    ("c21", ((7, 0),)),
+    ("c30", ((3, 0),)),
+    ("c40", ((4, 0),)),
+)
+
+EQ9_MONOMIAL_POWERS = {
+    "c00": (0, 0),
+    "c01": (0, 1),
+    "c02": (0, 2),
+    "c10": (1, 0),
+    "c11": (1, 1),
+    "c20": (2, 0),
+    "c21": (2, 1),
+    "c30": (3, 0),
+    "c40": (4, 0),
+}
+
 
 class FitError(RuntimeError):
     pass
@@ -177,6 +204,49 @@ def basis_vector(k3: float, k4: float, k3t: float) -> np.ndarray:
         ),
         dtype=float,
     )
+
+
+def eq9_coefficient_values(
+    normalized_coefficients: Sequence[float], k3t: float
+) -> dict[str, float]:
+    """Evaluate the c_nm(kappa_3t) functions in the Eq. (9) form."""
+    coefficients = np.asarray(normalized_coefficients, dtype=float)
+    if coefficients.shape != (len(BASIS_NAMES),):
+        raise ValueError(f"expected {len(BASIS_NAMES)} normalized coefficients")
+    return {
+        name: float(sum(coefficients[index] * k3t**power for index, power in terms))
+        for name, terms in EQ9_COEFFICIENT_TERMS
+    }
+
+
+def eq9_ratio_from_coefficients(
+    k3: float,
+    k4: float,
+    k3t: float,
+    normalized_coefficients: Sequence[float],
+) -> float:
+    """Evaluate the regrouped Eq. (9) representation of the fitted ratio."""
+    x = k3 - 1.0
+    y = k4 - 1.0
+    coefficient_values = eq9_coefficient_values(normalized_coefficients, k3t)
+    return float(
+        sum(
+            coefficient_values[name] * x**powers[0] * y**powers[1]
+            for name, powers in EQ9_MONOMIAL_POWERS.items()
+        )
+    )
+
+
+def _latex_polynomial(
+    normalized_coefficients: Sequence[float], terms: Sequence[tuple[int, int]]
+) -> str:
+    pieces: list[str] = []
+    for term_index, (coefficient_index, power) in enumerate(terms):
+        value = float(normalized_coefficients[coefficient_index])
+        number = f"{value:.8g}" if term_index == 0 else f"{value:+.8g}"
+        monomial = "" if power == 0 else "z" if power == 1 else f"z^{power}"
+        pieces.append(number + monomial)
+    return " ".join(pieces)
 
 
 def draft_ratio(energy: str, k3: float, k4: float) -> float:
@@ -408,9 +478,17 @@ def write_outputs(
     output.mkdir(parents=True, exist_ok=True)
     coefficient_rows: list[dict[str, object]] = []
     payload: dict[str, object] = {"basis": list(BASIS_NAMES), "energies": {}}
-    latex_lines = [
+    expanded_latex_lines = [
         r"% x=\Delta\kappa_3, y=\Delta\kappa_4, z=\kappa_{3t}",
         r"\begin{align}",
+    ]
+    latex_lines = [
+        r"% Eq. (9) form at fixed \kappa_t=1 and \kappa_{2t}=0",
+        r"% x=\Delta\kappa_3, y=\Delta\kappa_4, z=\kappa_{3t}",
+        r"\begin{equation}",
+        r"\sigma_{\rm LO}^{\sqrt{s}}=(\sigma_{\rm LO}^{\sqrt{s}})_{\rm SM}",
+        r"\sum_{n,m}c_{nm}^{\sqrt{s}}(z)x^n y^m\,.",
+        r"\end{equation}",
     ]
     all_validation_rows: list[dict[str, object]] = []
     all_fit_rows: list[dict[str, object]] = []
@@ -453,11 +531,18 @@ def write_outputs(
                 equation_terms.append(f"{value:.8g}")
             else:
                 equation_terms.append(f"{value:+.8g}{monomial}")
-        latex_lines.append(
+        expanded_latex_lines.append(
             rf"\frac{{\sigma_{{{energy}\,\mathrm{{TeV}}}}}}{{\sigma^{{\rm SM}}_{{{energy}\,\mathrm{{TeV}}}}}} &= "
             + " ".join(equation_terms)
             + r" \\"
         )
+        latex_lines.append(r"\begin{align}")
+        for name, terms in EQ9_COEFFICIENT_TERMS:
+            polynomial = _latex_polynomial(result.normalized_coefficients, terms)
+            latex_lines.append(
+                rf"c_{{{name[1:]}}}^{{{energy}\,\mathrm{{TeV}}}}(z) &= {polynomial} \\"
+            )
+        latex_lines.append(r"\end{align}")
         write_matrix(output / f"covariance-{energy.replace('.', 'p')}tev.csv", result.normalized_covariance)
         diagonal = np.sqrt(np.maximum(0.0, np.diag(result.normalized_covariance)))
         denominator = np.outer(diagonal, diagonal)
@@ -555,8 +640,11 @@ def write_outputs(
     (output / "coefficients.json").write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    latex_lines.append(r"\end{align}")
+    expanded_latex_lines.append(r"\end{align}")
     (output / "equations.tex").write_text("\n".join(latex_lines) + "\n", encoding="utf-8")
+    (output / "equations-expanded.tex").write_text(
+        "\n".join(expanded_latex_lines) + "\n", encoding="utf-8"
+    )
 
     fit_fields = [
         "energy_tev",
