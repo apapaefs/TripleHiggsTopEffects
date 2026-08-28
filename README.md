@@ -494,9 +494,9 @@ python3 scripts/plot_ct3_shapes.py \
 
 For a comparison in which `k3` and `k4` also differ between curves, repeat
 `--sample MANIFEST K3 K4 CT3`.  The first selection must be the SM reference.
-The publication benchmarks are regenerated with the same setup as the rate
-fit: PDF4LHC21_40 member 0 (LHAPDF ID 93100), MadGraph scale choice 4, and
-`scalefact=0.5`, corresponding to `muR=muF=m3h/2`.  Launch the guarded
+The earlier SM-rate benchmarks are regenerated with the same setup as the
+rate fit: PDF4LHC21_40 member 0 (LHAPDF ID 93100), MadGraph scale choice 4,
+and `scalefact=0.5`, corresponding to `muR=muF=m3h/2`.  Launch that guarded
 100,000-event production with:
 
 ```bash
@@ -529,6 +529,45 @@ are rounded from the largest weighted 99.5th percentile across the samples;
 the accompanying `14tev-ct3-rate-matched-benchmarks-validation.json` records
 the binning, common generation settings, plotted coverage, and normalized-to-
 absolute histogram closure checks.
+
+The Figure 9 replacement instead uses the two-significant-figure benchmarks
+`(k3,k4,kappa3t)=(2.1,23,-2.3)` and `(2.2,0,2.2)`.  Both have fitted and
+generated 14 TeV signal strengths of 65 to two significant figures.  The
+final 100,000-event samples have total-variation distances from the SM of
+`(0.49,0.47)` and `(0.41,0.41)` in `(m3h,sum_pT_h)`, respectively.  Generate
+or reproduce the samples under the thermal guard with:
+
+```bash
+screen -L \
+  -Logfile logs/14tev-ct3-mu65-shapes/screen.log \
+  -dmS hhh_ct3_mu65_100k \
+  scripts/run_14tev_ct3_mu65_shapes_odysseus.sh
+```
+
+The launcher reuses the existing 100,000-event SM reference, then writes both
+normalised and absolute-bin-cross-section figures.  To redraw Figure 9 only:
+
+```bash
+python3 scripts/plot_ct3_shapes.py \
+  --sample artifacts/lhe/14tev-ct3-rate-matched-pdf4lhc21/manifest.jsonl 1 1 0 \
+  --sample artifacts/lhe/14tev-ct3-mu65-shapes/manifest.jsonl 2.1 23 -2.3 \
+  --sample artifacts/lhe/14tev-ct3-mu65-shapes/manifest.jsonl 2.2 0 2.2 \
+  --expected-pdlabel lhapdf \
+  --expected-lhaid 93100 \
+  --expected-dynamical-scale-choice 4 \
+  --expected-scalefact 0.5 \
+  --expected-beam-energy-gev 7000 \
+  --m3h-range 400 1200 \
+  --sum-pt-range 0 1200 \
+  --output artifacts/figures/14tev-ct3-mu65-benchmarks \
+  --collider-label HL-LHC
+```
+
+The fixed 40 GeV bins and displayed ranges match Figures 7 and 8.  The
+validation JSON records the fraction of each total distribution outside those
+ranges, histogram closure, and the total-variation shape distance from the SM
+inside each displayed range.  Omitting the two range options restores the
+weighted-99.5th-percentile adaptive range.
 
 ### Three-energy `kappa3t` rate parametrisation
 

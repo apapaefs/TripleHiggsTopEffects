@@ -1,0 +1,7 @@
+# 14 TeV benchmarks selected from the fitted inclusive relation at mu_3h=65.
+# All displayed nonzero couplings are specified to two significant figures.
+# Fitted ratios: 64.9620 for (2.1,23,-2.3), 65.0177 for (2.2,0,2.2).
+# Independent 1k-event pilots: 65.32 and 64.88 relative to the matched SM run.
+name,k3,k4,ct3
+mu65_k3_p2p1_k4_p23_ct3_m2p3,2.1,23,-2.3
+mu65_k3_p2p2_k4_p0_ct3_p2p2,2.2,0,2.2

@@ -12,10 +12,12 @@ from scripts.plot_ct3_shapes import (
     PlotError,
     adaptive_upper_edge,
     absolute_bin_cross_sections,
+    fixed_bin_edges,
     normalized_bin_weights,
     parse_sample_selection,
     read_event_shapes,
     sample_label,
+    total_variation_distance,
     validate_sample_settings,
     weighted_quantile,
     write_summary,
@@ -97,6 +99,25 @@ class LheShapeTests(unittest.TestCase):
         )
         self.assertEqual(upper, 1000.0)
         self.assertEqual((upper - 360.0) % 40.0, 0.0)
+
+    def test_fixed_ranges_match_figure_7_binning(self) -> None:
+        m3h_edges = fixed_bin_edges((400.0, 1200.0))
+        sum_pt_edges = fixed_bin_edges((0.0, 1200.0))
+        self.assertEqual(len(m3h_edges) - 1, 20)
+        self.assertEqual(len(sum_pt_edges) - 1, 30)
+        self.assertTrue(
+            all(right - left == 40.0 for left, right in zip(m3h_edges, m3h_edges[1:]))
+        )
+
+    def test_fixed_range_must_align_with_bin_width(self) -> None:
+        with self.assertRaises(PlotError):
+            fixed_bin_edges((400.0, 1210.0))
+
+    def test_total_variation_distance_detects_shape_changes(self) -> None:
+        self.assertEqual(total_variation_distance([1.0, 1.0], [2.0, 2.0]), 0.0)
+        self.assertAlmostEqual(
+            total_variation_distance([3.0, 1.0], [1.0, 3.0]), 0.5
+        )
 
     def test_sm_self_couplings_are_omitted_from_curve_labels(self) -> None:
         self.assertEqual(

@@ -372,6 +372,53 @@ def adaptive_upper_edge(
     return lower_edge + bin_count * bin_width
 
 
+def fixed_bin_edges(
+    plot_range: Sequence[float], *, bin_width: float = SHAPE_BIN_WIDTH_GEV
+) -> tuple[float, ...]:
+    """Return fixed, uniformly spaced edges after validating the requested range."""
+    if len(plot_range) != 2:
+        raise PlotError("a fixed plot range requires exactly two edges")
+    lower_edge, upper_edge = map(float, plot_range)
+    if not math.isfinite(lower_edge) or not math.isfinite(upper_edge):
+        raise PlotError("fixed plot-range edges must be finite")
+    if bin_width <= 0.0 or upper_edge <= lower_edge:
+        raise PlotError("fixed plot ranges must be increasing and use positive bins")
+    bin_count_float = (upper_edge - lower_edge) / bin_width
+    bin_count = round(bin_count_float)
+    if bin_count < 1 or not math.isclose(
+        bin_count_float, bin_count, rel_tol=0.0, abs_tol=1e-10
+    ):
+        raise PlotError(
+            f"fixed plot range [{lower_edge:g}, {upper_edge:g}] is not an "
+            f"integer multiple of the {bin_width:g} GeV bin width"
+        )
+    return tuple(lower_edge + index * bin_width for index in range(bin_count + 1))
+
+
+def total_variation_distance(
+    histogram: Sequence[float], reference: Sequence[float]
+) -> float:
+    """Compare two plotted shapes after normalising each inside the shown range."""
+    import numpy as np
+
+    values = np.asarray(histogram, dtype=float)
+    reference_values = np.asarray(reference, dtype=float)
+    if values.shape != reference_values.shape or values.size == 0:
+        raise PlotError("shape-distance histograms must have equal nonzero sizes")
+    if not np.all(np.isfinite(values)) or not np.all(np.isfinite(reference_values)):
+        raise PlotError("shape-distance histograms must be finite")
+    if np.any(values < 0.0) or np.any(reference_values < 0.0):
+        raise PlotError("shape-distance histograms must be non-negative")
+    value_sum = float(values.sum())
+    reference_sum = float(reference_values.sum())
+    if value_sum <= 0.0 or reference_sum <= 0.0:
+        raise PlotError("shape-distance histograms must have positive integrals")
+    return float(
+        0.5
+        * np.abs(values / value_sum - reference_values / reference_sum).sum()
+    )
+
+
 def sample_label(ct3: Decimal, k3: Decimal, k4: Decimal) -> str:
     """Label a curve without repeating self-couplings fixed to their SM values."""
     if ct3 == SM_ZERO and k3 == SM_ONE and k4 == SM_ONE:
@@ -486,6 +533,9 @@ def plot_shapes(
     shapes: Sequence[EventShapes],
     output: Path,
     collider_label: str,
+    *,
+    m3h_range: Sequence[float] | None = None,
+    sum_pt_range: Sequence[float] | None = None,
 ) -> tuple[Path, Path, Path, Path, Path, Path]:
     if not samples or len(samples) != len(shapes):
         raise PlotError(
@@ -500,27 +550,49 @@ def plot_shapes(
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     import numpy as np
+    from matplotlib import font_manager
+
+    # The shared plotting cache can predate a newly installed font package.
+    # Register the Times-compatible faces explicitly so publication reruns are
+    # reproducible without requiring users to delete their Matplotlib cache.
+    for font_path in Path("/usr/share/fonts/truetype/croscore").glob(
+        "Tinos-*.ttf"
+    ):
+        font_manager.fontManager.addfont(str(font_path))
 
     output.parent.mkdir(parents=True, exist_ok=True)
-    m3h_lower = 360.0
-    sum_pt_lower = 0.0
-    m3h_upper = adaptive_upper_edge(
-        ((event_shapes.m3h, event_shapes.weights) for event_shapes in shapes),
-        lower_edge=m3h_lower,
-    )
-    sum_pt_upper = adaptive_upper_edge(
-        (
-            (event_shapes.sum_pt_h, event_shapes.weights)
-            for event_shapes in shapes
-        ),
-        lower_edge=sum_pt_lower,
-    )
-    m3h_edges = np.arange(
-        m3h_lower, m3h_upper + SHAPE_BIN_WIDTH_GEV, SHAPE_BIN_WIDTH_GEV
-    )
-    sum_pt_edges = np.arange(
-        sum_pt_lower, sum_pt_upper + SHAPE_BIN_WIDTH_GEV, SHAPE_BIN_WIDTH_GEV
-    )
+    if m3h_range is None:
+        m3h_lower = 360.0
+        m3h_upper = adaptive_upper_edge(
+            ((event_shapes.m3h, event_shapes.weights) for event_shapes in shapes),
+            lower_edge=m3h_lower,
+        )
+        m3h_edges = np.arange(
+            m3h_lower, m3h_upper + SHAPE_BIN_WIDTH_GEV, SHAPE_BIN_WIDTH_GEV
+        )
+    else:
+        m3h_edges = np.asarray(fixed_bin_edges(m3h_range), dtype=float)
+        m3h_lower, m3h_upper = float(m3h_edges[0]), float(m3h_edges[-1])
+    if sum_pt_range is None:
+        sum_pt_lower = 0.0
+        sum_pt_upper = adaptive_upper_edge(
+            (
+                (event_shapes.sum_pt_h, event_shapes.weights)
+                for event_shapes in shapes
+            ),
+            lower_edge=sum_pt_lower,
+        )
+        sum_pt_edges = np.arange(
+            sum_pt_lower,
+            sum_pt_upper + SHAPE_BIN_WIDTH_GEV,
+            SHAPE_BIN_WIDTH_GEV,
+        )
+    else:
+        sum_pt_edges = np.asarray(fixed_bin_edges(sum_pt_range), dtype=float)
+        sum_pt_lower, sum_pt_upper = (
+            float(sum_pt_edges[0]),
+            float(sum_pt_edges[-1]),
+        )
     styles = (
         {"color": "black", "linestyle": "-", "linewidth": 1.6},
         {"color": "#d62728", "linestyle": "--", "linewidth": 1.6},
@@ -531,9 +603,12 @@ def plot_shapes(
     plt.rcParams.update(
         {
             "font.family": "serif",
+            "font.serif": ["Tinos", "STIXGeneral"],
             "font.size": 10,
-            "mathtext.fontset": "cm",
+            "mathtext.fontset": "stix",
             "axes.linewidth": 0.9,
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
         }
     )
     normalized_histograms = [
@@ -564,8 +639,8 @@ def plot_shapes(
     ]
 
     validation_records = []
-    for sample, event_shapes, normalized, absolute in zip(
-        samples, shapes, normalized_histograms, absolute_histograms
+    for sample_index, (sample, event_shapes, normalized, absolute) in enumerate(
+        zip(samples, shapes, normalized_histograms, absolute_histograms)
     ):
         if event_shapes.event_count != sample.generated_events:
             raise PlotError(
@@ -573,8 +648,12 @@ def plot_shapes(
                 f"events but the LHE contains {event_shapes.event_count}"
             )
         observables = {}
-        for name, normalized_histogram, absolute_histogram in zip(
-            ("m3h", "sum_pt_h"), normalized, absolute
+        for observable_index, (
+            name,
+            normalized_histogram,
+            absolute_histogram,
+        ) in enumerate(
+            zip(("m3h", "sum_pt_h"), normalized, absolute)
         ):
             if not np.all(np.isfinite(normalized_histogram)) or not np.all(
                 np.isfinite(absolute_histogram)
@@ -592,7 +671,13 @@ def plot_shapes(
             coverage = float(normalized_histogram.sum())
             if coverage < -1e-12 or coverage > 1.0 + 1e-12:
                 raise PlotError(f"{sample.run_name}: invalid plotted-weight coverage")
-            if coverage + 1e-12 < MIN_PLOTTED_WEIGHT_FRACTION:
+            uses_adaptive_range = (
+                m3h_range is None if name == "m3h" else sum_pt_range is None
+            )
+            if (
+                uses_adaptive_range
+                and coverage + 1e-12 < MIN_PLOTTED_WEIGHT_FRACTION
+            ):
                 raise PlotError(
                     f"{sample.run_name}: only {coverage:.3%} of the {name} "
                     f"distribution lies inside the plotted range"
@@ -603,6 +688,14 @@ def plot_shapes(
                 "absolute_bin_sum_pb": float(absolute_histogram.sum()),
                 "maximum_closure_error_pb": float(
                     np.max(np.abs(absolute_histogram - expected_absolute))
+                ),
+                "shape_total_variation_from_sm_in_plotted_range": (
+                    total_variation_distance(
+                        normalized_histogram,
+                        normalized_histograms[0][observable_index],
+                    )
+                    if sample_index
+                    else 0.0
                 ),
             }
         validation_records.append(
@@ -617,7 +710,7 @@ def plot_shapes(
         )
 
     def render(*, absolute: bool, destination: Path) -> tuple[Path, Path]:
-        figure, axes = plt.subplots(1, 2, figsize=(8.2, 3.65))
+        figure, axes = plt.subplots(1, 2, figsize=(8.2, 3.9))
         plotted: list[tuple[object, object]] = []
         source_histograms = absolute_histograms if absolute else normalized_histograms
         for index, (sample, histograms) in enumerate(
@@ -646,7 +739,6 @@ def plot_shapes(
             axis.set_yscale("log")
             axis.tick_params(which="both", direction="in", top=True, right=True)
             axis.minorticks_on()
-            axis.legend(frameon=False, fontsize=8.5, loc="upper right")
         axes[0].set_xlim(m3h_lower, m3h_upper)
         axes[0].set_xlabel(r"$m_{3h}\;[\mathrm{GeV}]$")
         axes[1].set_xlim(sum_pt_lower, sum_pt_upper)
@@ -687,9 +779,23 @@ def plot_shapes(
                 r"\;[1/(40\,\mathrm{GeV})]$"
             )
 
-        # Leave enough room for the centered final tick labels on the right.
+        handles, labels = axes[0].get_legend_handles_labels()
+        figure.legend(
+            handles,
+            labels,
+            frameon=False,
+            fontsize=8.5,
+            loc="upper center",
+            bbox_to_anchor=(0.5, 0.995),
+            ncol=min(3, len(samples)),
+            columnspacing=1.5,
+            handlelength=3.0,
+        )
+
+        # The shared legend sits above the panel titles and cannot obscure a
+        # distribution; retain room for centered final ticks on the right.
         figure.subplots_adjust(
-            left=0.105, right=0.965, bottom=0.17, top=0.89, wspace=0.30
+            left=0.105, right=0.965, bottom=0.16, top=0.80, wspace=0.30
         )
         pdf = destination.with_suffix(".pdf")
         png = destination.with_suffix(".png")
@@ -730,8 +836,20 @@ def plot_shapes(
                     "sum_pt_h": list(map(float, sum_pt_edges)),
                 },
                 "range_policy": {
-                    "weighted_quantile": SHAPE_RANGE_QUANTILE,
-                    "minimum_plotted_weight_fraction": (
+                    "m3h": (
+                        {"mode": "adaptive", "weighted_quantile": SHAPE_RANGE_QUANTILE}
+                        if m3h_range is None
+                        else {"mode": "fixed", "range_gev": [m3h_lower, m3h_upper]}
+                    ),
+                    "sum_pt_h": (
+                        {"mode": "adaptive", "weighted_quantile": SHAPE_RANGE_QUANTILE}
+                        if sum_pt_range is None
+                        else {
+                            "mode": "fixed",
+                            "range_gev": [sum_pt_lower, sum_pt_upper],
+                        }
+                    ),
+                    "adaptive_minimum_plotted_weight_fraction": (
                         MIN_PLOTTED_WEIGHT_FRACTION
                     ),
                     "bin_width_gev": SHAPE_BIN_WIDTH_GEV,
@@ -790,6 +908,20 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--collider-label", default="HL-LHC")
+    parser.add_argument(
+        "--m3h-range",
+        type=float,
+        nargs=2,
+        metavar=("LOW", "HIGH"),
+        help="fixed m3h plotting range in GeV (default: adaptive)",
+    )
+    parser.add_argument(
+        "--sum-pt-range",
+        type=float,
+        nargs=2,
+        metavar=("LOW", "HIGH"),
+        help="fixed sum-pT plotting range in GeV (default: adaptive)",
+    )
     parser.add_argument("--expected-pdlabel")
     parser.add_argument("--expected-lhaid", type=int)
     parser.add_argument("--expected-dynamical-scale-choice", type=int)
@@ -886,7 +1018,14 @@ def main() -> int:
                 f"manifest records {sample.generated_events}"
             )
         shapes.append(event_shapes)
-    outputs = plot_shapes(samples, shapes, output, args.collider_label)
+    outputs = plot_shapes(
+        samples,
+        shapes,
+        output,
+        args.collider_label,
+        m3h_range=args.m3h_range,
+        sum_pt_range=args.sum_pt_range,
+    )
     for path in outputs:
         print(f"Wrote {path}")
     return 0

@@ -186,8 +186,16 @@ def plot_plane(
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     import numpy as np
+    from matplotlib import font_manager
     from matplotlib.lines import Line2D
     from matplotlib.patches import Patch
+
+    # Explicit registration avoids a stale shared Matplotlib font cache after
+    # the Times-compatible font package is installed.
+    for font_path in Path("/usr/share/fonts/truetype/croscore").glob(
+        "Tinos-*.ttf"
+    ):
+        font_manager.fontManager.addfont(str(font_path))
 
     if horizontal_coupling == "k3":
         horizontal_ranges = ((-25.0, 25.0), (-15.0, 15.0))
@@ -205,14 +213,21 @@ def plot_plane(
         ("14", "HL-LHC", 125.0),
     )
     k3_vertical_ranges = {"13": (-8.0, 8.0), "14": (-4.0, 4.0)}
-    red = "#c9252d"
-    yellow = "#f3d44e"
+    # Dominant raster colours sampled from the corresponding regions in
+    # Figures 3 and 4: pale rose, pure yellow, and their gold overlap.
+    rate_fill = "#e8bfbf"
+    rate_outline = "#aa0000"
+    unitarity_fill = "#ffff00"
+    overlap_fill = "#eabf00"
     plt.rcParams.update(
         {
             "font.family": "serif",
-            "font.size": 11,
-            "mathtext.fontset": "cm",
+            "font.serif": ["Tinos", "STIXGeneral"],
+            "font.size": 10,
+            "mathtext.fontset": "stix",
             "axes.linewidth": 1.0,
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
         }
     )
     figure, axes = plt.subplots(1, 2, figsize=(8.2, 3.7))
@@ -247,16 +262,27 @@ def plot_plane(
             k3t_grid,
             allowed.astype(float),
             levels=(0.5, 1.5),
-            colors=(red,),
-            alpha=0.28,
+            colors=(rate_fill,),
             zorder=1,
         )
         axis.axvspan(
             -unitarity_bound,
             unitarity_bound,
-            facecolor=yellow,
-            alpha=0.58,
+            facecolor=unitarity_fill,
             zorder=2,
+        )
+        in_unitarity_band = np.logical_and(
+            horizontal_grid >= -unitarity_bound,
+            horizontal_grid <= unitarity_bound,
+        )
+        overlap = np.logical_and(allowed, in_unitarity_band)
+        axis.contourf(
+            horizontal_grid,
+            k3t_grid,
+            overlap.astype(float),
+            levels=(0.5, 1.5),
+            colors=(overlap_fill,),
+            zorder=2.5,
         )
         axis.axvline(-unitarity_bound, color="black", linestyle=":", linewidth=1.2, zorder=3)
         axis.axvline(unitarity_bound, color="black", linestyle=":", linewidth=1.2, zorder=3)
@@ -265,33 +291,53 @@ def plot_plane(
             k3t_grid,
             ratio,
             levels=(signal_strength_limit,),
-            colors=(red,),
+            colors=(rate_outline,),
             linewidths=1.8,
             zorder=4,
         )
         axis.plot(sm_horizontal, 0.0, "o", color="black", markersize=4.5, zorder=5)
-        axis.set_title(title, fontsize=14)
+        axis.set_title(title, fontsize=12.5)
         axis.set_xlim(*horizontal_range)
         axis.set_ylim(*vertical_range)
         axis.set_xlabel(horizontal_label)
         axis.set_ylabel(r"$\kappa_{3t}$")
         axis.tick_params(which="both", direction="in", top=True, right=True)
         axis.minorticks_on()
+        limit_location = (0.96, 0.95) if horizontal_coupling == "k3" else (0.04, 0.05)
         axis.text(
-            0.04,
-            0.95,
+            *limit_location,
             rf"$\mu_{{3h}}<{signal_strength_limit:g}$",
             transform=axis.transAxes,
-            ha="left",
-            va="top",
+            ha="right" if horizontal_coupling == "k3" else "left",
+            va="top" if horizontal_coupling == "k3" else "bottom",
             fontsize=10,
         )
         handles = (
-            Patch(facecolor=red, edgecolor=red, alpha=0.28, label="triple-Higgs"),
-            Patch(facecolor=yellow, edgecolor="black", linestyle=":", alpha=0.58, label="unitarity"),
+            Patch(
+                facecolor=rate_outline,
+                edgecolor=rate_outline,
+                label="triple-Higgs",
+            ),
+            Patch(
+                facecolor=unitarity_fill,
+                edgecolor="black",
+                linestyle=":",
+                label="unitarity",
+            ),
             Line2D([], [], marker="o", linestyle="none", color="black", markersize=4.5, label="SM"),
         )
-        axis.legend(handles=handles, frameon=False, loc="lower right", fontsize=9)
+        # Use the empty outer corner of each projection.  The kappa4 ellipses
+        # reach the upper-left corner, whereas the kappa3 regions do not.
+        legend_location = "upper left" if horizontal_coupling == "k3" else "upper right"
+        legend_anchor = (0.015, 0.985) if horizontal_coupling == "k3" else (0.985, 0.985)
+        axis.legend(
+            handles=handles,
+            frameon=False,
+            loc=legend_location,
+            bbox_to_anchor=legend_anchor,
+            borderaxespad=0.0,
+            fontsize=8.5,
+        )
 
     figure.subplots_adjust(left=0.095, right=0.985, bottom=0.17, top=0.88, wspace=0.25)
     output.parent.mkdir(parents=True, exist_ok=True)
