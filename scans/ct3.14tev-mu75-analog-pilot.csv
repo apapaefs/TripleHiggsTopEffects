@@ -1,0 +1,5 @@
+# 14 TeV pilot points chosen as the closest two-significant-figure
+# mu_3h = 75 analogues of the hard and soft Figure 9 benchmarks.
+name,k3,k4,ct3
+mu75_analog_hard_k3_p2p1_k4_p16_ct3_m2p3,2.1,16,-2.3
+mu75_analog_soft_k3_p6p0_k4_p64_ct3_m0p50,6.0,64,-0.50

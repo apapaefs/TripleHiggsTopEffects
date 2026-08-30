@@ -453,7 +453,12 @@ def pairwise_total_variation_records(
 
 
 def sample_label(
-    ct3: Decimal, k3: Decimal, k4: Decimal, *, compact: bool = False
+    ct3: Decimal,
+    k3: Decimal,
+    k4: Decimal,
+    *,
+    compact: bool = False,
+    multiline: bool = False,
 ) -> str:
     """Label a curve without repeating self-couplings fixed to their SM values."""
     if ct3 == SM_ZERO and k3 == SM_ONE and k4 == SM_ONE:
@@ -465,6 +470,14 @@ def sample_label(
         entries.append(rf"\kappa_4={k4}")
     entries.append(rf"\kappa_{{3t}}={ct3}")
     separator = r",\;" if compact else r",\quad "
+    if multiline and len(entries) > 1:
+        return (
+            "$"
+            + separator.join(entries[:-1])
+            + "$\n$"
+            + entries[-1]
+            + "$"
+        )
     return "$" + separator.join(entries) + "$"
 
 
@@ -573,6 +586,7 @@ def plot_shapes(
     m3h_range: Sequence[float] | None = None,
     sum_pt_range: Sequence[float] | None = None,
     separate_panels: bool = False,
+    minimum_plotted_weight_fraction: float | None = None,
 ) -> tuple[Path, ...]:
     if not samples or len(samples) != len(shapes):
         raise PlotError(
@@ -714,13 +728,21 @@ def plot_shapes(
             uses_adaptive_range = (
                 m3h_range is None if name == "m3h" else sum_pt_range is None
             )
+            required_coverage = (
+                minimum_plotted_weight_fraction
+                if minimum_plotted_weight_fraction is not None
+                else MIN_PLOTTED_WEIGHT_FRACTION
+                if uses_adaptive_range
+                else None
+            )
             if (
-                uses_adaptive_range
-                and coverage + 1e-12 < MIN_PLOTTED_WEIGHT_FRACTION
+                required_coverage is not None
+                and coverage + 1e-12 < required_coverage
             ):
                 raise PlotError(
                     f"{sample.run_name}: only {coverage:.3%} of the {name} "
-                    f"distribution lies inside the plotted range"
+                    "distribution lies inside the plotted range; "
+                    f"required at least {required_coverage:.3%}"
                 )
             observables[name] = {
                 "normalized_bin_sum": coverage,
@@ -855,6 +877,8 @@ def plot_shapes(
         edges = m3h_edges if observable_index == 0 else sum_pt_edges
         lower = m3h_lower if observable_index == 0 else sum_pt_lower
         upper = m3h_upper if observable_index == 0 else sum_pt_upper
+        x_span = upper - lower
+        wide_panel = x_span > 1600.0
         plotted = []
         for index, (sample, histograms) in enumerate(
             zip(samples, source_histograms)
@@ -866,7 +890,11 @@ def plot_shapes(
                 edges,
                 baseline=None,
                 label=sample_label(
-                    sample.ct3, sample.k3, sample.k4, compact=True
+                    sample.ct3,
+                    sample.k3,
+                    sample.k4,
+                    compact=True,
+                    multiline=wide_panel,
                 ),
                 **styles[index % len(styles)],
             )
@@ -878,11 +906,42 @@ def plot_shapes(
             if value > 0
         ]
         axis.set_xlim(lower, upper)
-        axis.set_ylim(min(positive) * 0.7, max(positive) * 1.7)
+        upper_scale = 17.0 if absolute and wide_panel else 1.7
+        axis.set_ylim(min(positive) * 0.7, max(positive) * upper_scale)
         axis.set_yscale("log")
         axis.set_title(collider_label, fontsize=14, pad=7)
-        axis.xaxis.set_major_locator(ticker.MultipleLocator(200.0))
-        axis.xaxis.set_minor_locator(ticker.MultipleLocator(50.0))
+        if x_span <= 1600.0:
+            major_x_step = 200.0
+            minor_x_step = 50.0
+        else:
+            # Keep wide, tail-sensitive panels readable without crowding the
+            # four-digit tick labels.  Use conventional round-number anchors.
+            major_x_step = 600.0
+            minor_x_step = 120.0
+        major_x_start = (
+            lower
+            if x_span <= 1600.0
+            else math.ceil(lower / 200.0) * 200.0
+        )
+        minor_x_start = math.ceil(lower / minor_x_step) * minor_x_step
+        axis.xaxis.set_major_locator(
+            ticker.FixedLocator(
+                np.arange(
+                    major_x_start,
+                    upper + 0.5 * major_x_step,
+                    major_x_step,
+                )
+            )
+        )
+        axis.xaxis.set_minor_locator(
+            ticker.FixedLocator(
+                np.arange(
+                    minor_x_start,
+                    upper + 0.5 * minor_x_step,
+                    minor_x_step,
+                )
+            )
+        )
         major_subs = (1.0, 5.0) if observable_index == 0 else (1.0,)
         axis.yaxis.set_major_locator(
             ticker.LogLocator(base=10.0, subs=major_subs, numticks=20)
@@ -954,15 +1013,17 @@ def plot_shapes(
                 )
         axis.legend(
             frameon=False,
-            fontsize=9.3,
-            loc="lower left",
-            bbox_to_anchor=(0.055, 0.075),
+            fontsize=8.8 if wide_panel else 9.3,
+            loc="upper right" if wide_panel else "lower left",
+            bbox_to_anchor=(0.97, 0.97) if wide_panel else (0.055, 0.075),
             borderaxespad=0.0,
             handlelength=2.0,
             handletextpad=0.7,
-            labelspacing=1.45,
+            labelspacing=0.9 if wide_panel else 1.45,
         )
-        figure.subplots_adjust(left=0.20, right=0.92, bottom=0.155, top=0.91)
+        # The larger bottom and right margins keep the sum-pT label and the
+        # final four-digit tick fully inside the fixed publication canvas.
+        figure.subplots_adjust(left=0.20, right=0.84, bottom=0.245, top=0.91)
         pdf = destination.with_suffix(".pdf")
         png = destination.with_suffix(".png")
         figure.savefig(pdf)
@@ -1055,6 +1116,9 @@ def plot_shapes(
                     "adaptive_minimum_plotted_weight_fraction": (
                         MIN_PLOTTED_WEIGHT_FRACTION
                     ),
+                    "required_minimum_plotted_weight_fraction": (
+                        minimum_plotted_weight_fraction
+                    ),
                     "bin_width_gev": SHAPE_BIN_WIDTH_GEV,
                 },
                 "samples": validation_records,
@@ -1129,6 +1193,14 @@ def parse_args() -> argparse.Namespace:
             "in the publication distribution style"
         ),
     )
+    parser.add_argument(
+        "--minimum-plotted-weight-fraction",
+        type=float,
+        help=(
+            "minimum fraction of every selected distribution required inside "
+            "each displayed range (default: enforce 0.995 for adaptive ranges)"
+        ),
+    )
     parser.add_argument("--expected-pdlabel")
     parser.add_argument("--expected-lhaid", type=int)
     parser.add_argument("--expected-dynamical-scale-choice", type=int)
@@ -1186,6 +1258,10 @@ def parse_args() -> argparse.Namespace:
             parser.error("--ct3-values must be unique")
         if args.ct3_values[0] != 0:
             parser.error("the first --ct3-values entry must be 0 (the SM reference)")
+    if args.minimum_plotted_weight_fraction is not None and not (
+        0.0 <= args.minimum_plotted_weight_fraction <= 1.0
+    ):
+        parser.error("--minimum-plotted-weight-fraction must lie in [0, 1]")
     return args
 
 
@@ -1233,6 +1309,9 @@ def main() -> int:
         m3h_range=args.m3h_range,
         sum_pt_range=args.sum_pt_range,
         separate_panels=args.separate_panels,
+        minimum_plotted_weight_fraction=(
+            args.minimum_plotted_weight_fraction
+        ),
     )
     for path in outputs:
         print(f"Wrote {path}")

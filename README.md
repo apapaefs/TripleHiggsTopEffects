@@ -531,49 +531,55 @@ the binning, common generation settings, plotted coverage, and normalized-to-
 absolute histogram closure checks.
 
 The Figure 9 replacement uses the two-significant-figure benchmarks
-`(k3,k4,kappa3t)=(2.1,23,-2.3)` and `(6.0,59,-0.50)`.  Their 100,000-event
-14 TeV samples give signal strengths of `64.95` and `64.80`, respectively,
-and pairwise total-variation distances of `(0.708,0.660)` in
-`(m3h,sum_pT_h)`.  Their inclusive cross sections differ by only `0.24%`.
-The launcher reuses the existing 100,000-event first benchmark and generates
-the replacement point under the thermal guard:
+`(k3,k4,kappa3t)=(2.1,16,-2.3)` and `(6.0,64,-0.48)`.  The inclusive-rate fit
+predicts signal strengths of `75.046` and `75.100`, respectively.  These are
+the `mu3h ~= 75` analogues of the hard- and soft-spectrum benchmarks and
+retain their large mutual shape separation.  The final 100,000-event samples
+give signal strengths of `74.973` and `75.092`, with cross sections of
+`0.0038336` and `0.0038397` pb that differ by `0.16%`.  Their pairwise
+total-variation distances are `(0.705,0.640)` in `(m3h,sum_pT_h)`.  The
+launcher generates both samples concurrently under the thermal guard,
+assigning 192 logical CPU slots to each point:
 
 ```bash
 screen -L \
-  -Logfile logs/14tev-ct3-mu65-shape-replacement/campaign.screen.log \
-  -dmS hhh_ct3_mu65_replace_100k \
-  scripts/run_14tev_ct3_mu65_shapes_odysseus.sh
+  -Logfile logs/14tev-ct3-mu75-shapes/campaign.screen.log \
+  -dmS hhh_ct3_mu75_100k \
+  scripts/run_14tev_ct3_mu75_shapes_odysseus.sh
 ```
 
 After successful production, the launcher reuses the existing 100,000-event
-SM and first-benchmark references, writes both normalised and absolute-bin-
-cross-section figures, installs the normalised panels in `HHH_YR5`, and
-rebuilds the extended and redline drafts.  To redraw Figure 9 only:
+SM reference, writes both normalised and absolute-bin-cross-section figures,
+installs the normalised panels in `HHH_YR5`, and rebuilds the extended and
+redline drafts.  To redraw Figure 9 only:
 
 ```bash
 python3 scripts/plot_ct3_shapes.py \
   --sample artifacts/lhe/14tev-ct3-rate-matched-pdf4lhc21/manifest.jsonl 1 1 0 \
-  --sample artifacts/lhe/14tev-ct3-mu65-shapes/manifest.jsonl 2.1 23 -2.3 \
-  --sample artifacts/lhe/14tev-ct3-mu65-shape-replacement/manifest.jsonl 6.0 59 -0.50 \
+  --sample artifacts/lhe/14tev-ct3-mu75-shapes/manifest.jsonl 2.1 16 -2.3 \
+  --sample artifacts/lhe/14tev-ct3-mu75-shapes/manifest.jsonl 6.0 64 -0.48 \
   --expected-pdlabel lhapdf \
   --expected-lhaid 93100 \
   --expected-dynamical-scale-choice 4 \
   --expected-scalefact 0.5 \
   --expected-beam-energy-gev 7000 \
-  --m3h-range 400 1200 \
-  --sum-pt-range 0 1200 \
+  --m3h-range 360 3400 \
+  --sum-pt-range 0 3000 \
+  --minimum-plotted-weight-fraction 0.995 \
   --separate-panels \
-  --output artifacts/figures/14tev-ct3-mu65-benchmarks \
+  --output artifacts/figures/14tev-ct3-mu75-benchmarks \
   --collider-label HL-LHC
 ```
 
 This writes standalone `-m3h` and `-sum-pth` PDF/PNG panels, plus separate
 unnormalized panels carrying the `-unnormalized` suffix.  Their dimensions,
 internal legends, typography, ticks, and line styling follow Figures 7 and 8.
-The fixed 40 GeV bins and displayed ranges also match those figures.  The
-validation JSON records the fraction of each total distribution outside the
-ranges, histogram closure, and all pairwise total-variation shape distances
-inside each displayed range.  Omitting the two range options restores the
+The fixed 40 GeV bins match those figures.  The wider displayed ranges retain
+at least 99.5% of every sample, including the hard benchmark's weighted
+high-energy tails.  The validation JSON records the fraction of each total
+distribution outside the ranges, histogram closure, and all pairwise
+total-variation shape distances inside each displayed range.  Omitting the
+two range options restores the
 weighted-99.5th-percentile adaptive range.
 
 ### Three-energy `kappa3t` rate parametrisation

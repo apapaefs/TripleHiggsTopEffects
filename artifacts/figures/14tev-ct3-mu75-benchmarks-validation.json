@@ -1,0 +1,286 @@
+{
+  "checks_passed": true,
+  "separate_panels": true,
+  "common_settings": {
+    "pdlabel": "lhapdf",
+    "lhaid": 93100,
+    "dynamical_scale_choice": 4,
+    "scalefact": "0.5",
+    "beam_energy_gev": "7000"
+  },
+  "binning_gev": {
+    "m3h": [
+      360.0,
+      400.0,
+      440.0,
+      480.0,
+      520.0,
+      560.0,
+      600.0,
+      640.0,
+      680.0,
+      720.0,
+      760.0,
+      800.0,
+      840.0,
+      880.0,
+      920.0,
+      960.0,
+      1000.0,
+      1040.0,
+      1080.0,
+      1120.0,
+      1160.0,
+      1200.0,
+      1240.0,
+      1280.0,
+      1320.0,
+      1360.0,
+      1400.0,
+      1440.0,
+      1480.0,
+      1520.0,
+      1560.0,
+      1600.0,
+      1640.0,
+      1680.0,
+      1720.0,
+      1760.0,
+      1800.0,
+      1840.0,
+      1880.0,
+      1920.0,
+      1960.0,
+      2000.0,
+      2040.0,
+      2080.0,
+      2120.0,
+      2160.0,
+      2200.0,
+      2240.0,
+      2280.0,
+      2320.0,
+      2360.0,
+      2400.0,
+      2440.0,
+      2480.0,
+      2520.0,
+      2560.0,
+      2600.0,
+      2640.0,
+      2680.0,
+      2720.0,
+      2760.0,
+      2800.0,
+      2840.0,
+      2880.0,
+      2920.0,
+      2960.0,
+      3000.0,
+      3040.0,
+      3080.0,
+      3120.0,
+      3160.0,
+      3200.0,
+      3240.0,
+      3280.0,
+      3320.0,
+      3360.0,
+      3400.0
+    ],
+    "sum_pt_h": [
+      0.0,
+      40.0,
+      80.0,
+      120.0,
+      160.0,
+      200.0,
+      240.0,
+      280.0,
+      320.0,
+      360.0,
+      400.0,
+      440.0,
+      480.0,
+      520.0,
+      560.0,
+      600.0,
+      640.0,
+      680.0,
+      720.0,
+      760.0,
+      800.0,
+      840.0,
+      880.0,
+      920.0,
+      960.0,
+      1000.0,
+      1040.0,
+      1080.0,
+      1120.0,
+      1160.0,
+      1200.0,
+      1240.0,
+      1280.0,
+      1320.0,
+      1360.0,
+      1400.0,
+      1440.0,
+      1480.0,
+      1520.0,
+      1560.0,
+      1600.0,
+      1640.0,
+      1680.0,
+      1720.0,
+      1760.0,
+      1800.0,
+      1840.0,
+      1880.0,
+      1920.0,
+      1960.0,
+      2000.0,
+      2040.0,
+      2080.0,
+      2120.0,
+      2160.0,
+      2200.0,
+      2240.0,
+      2280.0,
+      2320.0,
+      2360.0,
+      2400.0,
+      2440.0,
+      2480.0,
+      2520.0,
+      2560.0,
+      2600.0,
+      2640.0,
+      2680.0,
+      2720.0,
+      2760.0,
+      2800.0,
+      2840.0,
+      2880.0,
+      2920.0,
+      2960.0,
+      3000.0
+    ]
+  },
+  "range_policy": {
+    "m3h": {
+      "mode": "fixed",
+      "range_gev": [
+        360.0,
+        3400.0
+      ]
+    },
+    "sum_pt_h": {
+      "mode": "fixed",
+      "range_gev": [
+        0.0,
+        3000.0
+      ]
+    },
+    "adaptive_minimum_plotted_weight_fraction": 0.995,
+    "required_minimum_plotted_weight_fraction": 0.995,
+    "bin_width_gev": 40.0
+  },
+  "samples": [
+    {
+      "run_name": "ct3_distribution14_pdf4lhc21_sm",
+      "events": 100000,
+      "manifest_events": 100000,
+      "total_event_weight": 5.1133,
+      "cross_section_pb": 5.1133e-05,
+      "observables": {
+        "m3h": {
+          "normalized_bin_sum": 0.9999799999992227,
+          "outside_range_fraction": 2.000000077728714e-05,
+          "absolute_bin_sum_pb": 5.1131977339960266e-05,
+          "maximum_closure_error_pb": 0.0,
+          "shape_total_variation_from_sm_in_plotted_range": 0.0
+        },
+        "sum_pt_h": {
+          "normalized_bin_sum": 0.9999699999992226,
+          "outside_range_fraction": 3.0000000777352653e-05,
+          "absolute_bin_sum_pb": 5.1131466009960264e-05,
+          "maximum_closure_error_pb": 0.0,
+          "shape_total_variation_from_sm_in_plotted_range": 0.0
+        }
+      }
+    },
+    {
+      "run_name": "ct3_mu75_hard_k3_p2p1_k4_p16_ct3_m2p3",
+      "events": 100000,
+      "manifest_events": 100000,
+      "total_event_weight": 383.36,
+      "cross_section_pb": 0.0038336,
+      "observables": {
+        "m3h": {
+          "normalized_bin_sum": 0.9955800000000152,
+          "outside_range_fraction": 0.0044199999999847694,
+          "absolute_bin_sum_pb": 0.0038166554880000587,
+          "maximum_closure_error_pb": 0.0,
+          "shape_total_variation_from_sm_in_plotted_range": 0.5096755546072939
+        },
+        "sum_pt_h": {
+          "normalized_bin_sum": 0.9966900000000175,
+          "outside_range_fraction": 0.0033099999999824936,
+          "absolute_bin_sum_pb": 0.003820910784000067,
+          "maximum_closure_error_pb": 0.0,
+          "shape_total_variation_from_sm_in_plotted_range": 0.4605092459531283
+        }
+      }
+    },
+    {
+      "run_name": "ct3_mu75_soft_k3_p6p0_k4_p64_ct3_m0p48",
+      "events": 100000,
+      "manifest_events": 100000,
+      "total_event_weight": 383.97,
+      "cross_section_pb": 0.0038397,
+      "observables": {
+        "m3h": {
+          "normalized_bin_sum": 0.9997999999988518,
+          "outside_range_fraction": 0.00020000000114817063,
+          "absolute_bin_sum_pb": 0.003838932059995592,
+          "maximum_closure_error_pb": 0.0,
+          "shape_total_variation_from_sm_in_plotted_range": 0.2850457767309223
+        },
+        "sum_pt_h": {
+          "normalized_bin_sum": 0.9998399999988519,
+          "outside_range_fraction": 0.00016000000114813062,
+          "absolute_bin_sum_pb": 0.003839085647995591,
+          "maximum_closure_error_pb": 0.0,
+          "shape_total_variation_from_sm_in_plotted_range": 0.24862683910624783
+        }
+      }
+    }
+  ],
+  "pairwise_shape_total_variation_in_plotted_range": [
+    {
+      "run_name_a": "ct3_distribution14_pdf4lhc21_sm",
+      "run_name_b": "ct3_mu75_hard_k3_p2p1_k4_p16_ct3_m2p3",
+      "observables": {
+        "m3h": 0.5096755546072939,
+        "sum_pt_h": 0.4605092459531283
+      }
+    },
+    {
+      "run_name_a": "ct3_distribution14_pdf4lhc21_sm",
+      "run_name_b": "ct3_mu75_soft_k3_p6p0_k4_p64_ct3_m0p48",
+      "observables": {
+        "m3h": 0.2850457767309223,
+        "sum_pt_h": 0.24862683910624783
+      }
+    },
+    {
+      "run_name_a": "ct3_mu75_hard_k3_p2p1_k4_p16_ct3_m2p3",
+      "run_name_b": "ct3_mu75_soft_k3_p6p0_k4_p64_ct3_m0p48",
+      "observables": {
+        "m3h": 0.7051074050968047,
+        "sum_pt_h": 0.6399630514643795
+      }
+    }
+  ]
+}

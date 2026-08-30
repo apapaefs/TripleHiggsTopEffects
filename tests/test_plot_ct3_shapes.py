@@ -170,6 +170,18 @@ class LheShapeTests(unittest.TestCase):
             r"$\kappa_3=0.8,\quad \kappa_{3t}=0$",
         )
 
+    def test_wide_panel_label_wraps_after_self_couplings(self) -> None:
+        self.assertEqual(
+            sample_label(
+                Decimal("-0.48"),
+                Decimal("6.0"),
+                Decimal("64"),
+                compact=True,
+                multiline=True,
+            ),
+            "$\\kappa_3=6.0,\\;\\kappa_4=64$\n$\\kappa_{3t}=-0.48$",
+        )
+
     def test_mixed_sample_selection_uses_physical_kappas(self) -> None:
         selection = parse_sample_selection(
             ["manifest.jsonl", "1.806", "0", "0.40"]

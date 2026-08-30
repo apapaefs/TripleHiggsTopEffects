@@ -1,0 +1,3 @@
+# Rate-tuned soft mu_3h = 75 analogue, retaining two significant figures.
+name,k3,k4,ct3
+mu75_analog_soft_tuned_k3_p6p0_k4_p64_ct3_m0p48,6.0,64,-0.48
