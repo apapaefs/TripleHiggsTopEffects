@@ -530,28 +530,31 @@ the accompanying `14tev-ct3-rate-matched-benchmarks-validation.json` records
 the binning, common generation settings, plotted coverage, and normalized-to-
 absolute histogram closure checks.
 
-The Figure 9 replacement instead uses the two-significant-figure benchmarks
-`(k3,k4,kappa3t)=(2.1,23,-2.3)` and `(2.2,0,2.2)`.  Both have fitted and
-generated 14 TeV signal strengths of 65 to two significant figures.  The
-final 100,000-event samples have total-variation distances from the SM of
-`(0.49,0.47)` and `(0.41,0.41)` in `(m3h,sum_pT_h)`, respectively.  Generate
-or reproduce the samples under the thermal guard with:
+The Figure 9 replacement uses the two-significant-figure benchmarks
+`(k3,k4,kappa3t)=(2.1,23,-2.3)` and `(6.0,59,-0.50)`.  Their 100,000-event
+14 TeV samples give signal strengths of `64.95` and `64.80`, respectively,
+and pairwise total-variation distances of `(0.708,0.660)` in
+`(m3h,sum_pT_h)`.  Their inclusive cross sections differ by only `0.24%`.
+The launcher reuses the existing 100,000-event first benchmark and generates
+the replacement point under the thermal guard:
 
 ```bash
 screen -L \
-  -Logfile logs/14tev-ct3-mu65-shapes/screen.log \
-  -dmS hhh_ct3_mu65_100k \
+  -Logfile logs/14tev-ct3-mu65-shape-replacement/campaign.screen.log \
+  -dmS hhh_ct3_mu65_replace_100k \
   scripts/run_14tev_ct3_mu65_shapes_odysseus.sh
 ```
 
-The launcher reuses the existing 100,000-event SM reference, then writes both
-normalised and absolute-bin-cross-section figures.  To redraw Figure 9 only:
+After successful production, the launcher reuses the existing 100,000-event
+SM and first-benchmark references, writes both normalised and absolute-bin-
+cross-section figures, installs the normalised panels in `HHH_YR5`, and
+rebuilds the extended and redline drafts.  To redraw Figure 9 only:
 
 ```bash
 python3 scripts/plot_ct3_shapes.py \
   --sample artifacts/lhe/14tev-ct3-rate-matched-pdf4lhc21/manifest.jsonl 1 1 0 \
   --sample artifacts/lhe/14tev-ct3-mu65-shapes/manifest.jsonl 2.1 23 -2.3 \
-  --sample artifacts/lhe/14tev-ct3-mu65-shapes/manifest.jsonl 2.2 0 2.2 \
+  --sample artifacts/lhe/14tev-ct3-mu65-shape-replacement/manifest.jsonl 6.0 59 -0.50 \
   --expected-pdlabel lhapdf \
   --expected-lhaid 93100 \
   --expected-dynamical-scale-choice 4 \
@@ -569,7 +572,7 @@ unnormalized panels carrying the `-unnormalized` suffix.  Their dimensions,
 internal legends, typography, ticks, and line styling follow Figures 7 and 8.
 The fixed 40 GeV bins and displayed ranges also match those figures.  The
 validation JSON records the fraction of each total distribution outside the
-ranges, histogram closure, and the total-variation shape distance from the SM
+ranges, histogram closure, and all pairwise total-variation shape distances
 inside each displayed range.  Omitting the two range options restores the
 weighted-99.5th-percentile adaptive range.
 

@@ -1,4 +1,4 @@
 ct3,k3,k4,run_name,events,cross_section_pb,cross_section_over_sm,pdlabel,lhaid,dynamical_scale_choice,scalefact,beam_energy_gev,lhe
 0,1,1,ct3_distribution14_pdf4lhc21_sm,100000,0.000051133,1,lhapdf,93100,4,0.5,7000,/home/apapaefs/Projects/TripleHiggsTopEffects/artifacts/lhe/14tev-ct3-rate-matched-pdf4lhc21/ct3_distribution14_pdf4lhc21_sm.unweighted_events.lhe.gz
 -2.3,2.1,23,ct3_mu65_k3_p2p1_k4_p23_ct3_m2p3,100000,0.0033213,64.95413920560107953767625604,lhapdf,93100,4,0.5,7000,/home/apapaefs/Projects/TripleHiggsTopEffects/artifacts/lhe/14tev-ct3-mu65-shapes/ct3_mu65_k3_p2p1_k4_p23_ct3_m2p3.unweighted_events.lhe.gz
-2.2,2.2,0,ct3_mu65_k3_p2p2_k4_p0_ct3_p2p2,100000,0.0033259,65.04410067862241605225588172,lhapdf,93100,4,0.5,7000,/home/apapaefs/Projects/TripleHiggsTopEffects/artifacts/lhe/14tev-ct3-mu65-shapes/ct3_mu65_k3_p2p2_k4_p0_ct3_p2p2.unweighted_events.lhe.gz
+-0.50,6.0,59,ct3_mu65_replacement_k3_p6p0_k4_p59_ct3_m0p50,100000,0.0033134,64.79964015410791465394168150,lhapdf,93100,4,0.5,7000,/home/apapaefs/Projects/TripleHiggsTopEffects/artifacts/lhe/14tev-ct3-mu65-shape-replacement/ct3_mu65_replacement_k3_p6p0_k4_p59_ct3_m0p50.unweighted_events.lhe.gz

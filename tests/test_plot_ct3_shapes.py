@@ -14,6 +14,7 @@ from scripts.plot_ct3_shapes import (
     absolute_bin_cross_sections,
     fixed_bin_edges,
     normalized_bin_weights,
+    pairwise_total_variation_records,
     parse_sample_selection,
     read_event_shapes,
     sample_label,
@@ -118,6 +119,28 @@ class LheShapeTests(unittest.TestCase):
         self.assertAlmostEqual(
             total_variation_distance([3.0, 1.0], [1.0, 3.0]), 0.5
         )
+
+    def test_pairwise_distances_cover_every_sample_pair(self) -> None:
+        samples = [
+            self.sample(run_name="sm"),
+            self.sample(run_name="hard"),
+            self.sample(run_name="soft"),
+        ]
+        records = pairwise_total_variation_records(
+            samples,
+            [
+                ([1.0, 1.0], [1.0, 1.0]),
+                ([0.0, 2.0], [2.0, 0.0]),
+                ([2.0, 0.0], [0.0, 2.0]),
+            ],
+        )
+        self.assertEqual(len(records), 3)
+        self.assertEqual(
+            (records[-1]["run_name_a"], records[-1]["run_name_b"]),
+            ("hard", "soft"),
+        )
+        self.assertEqual(records[-1]["observables"]["m3h"], 1.0)
+        self.assertEqual(records[-1]["observables"]["sum_pt_h"], 1.0)
 
     def test_sm_self_couplings_are_omitted_from_curve_labels(self) -> None:
         self.assertEqual(

@@ -419,6 +419,39 @@ def total_variation_distance(
     )
 
 
+def pairwise_total_variation_records(
+    samples: Sequence[ManifestSample],
+    normalized_histograms: Sequence[
+        tuple[Sequence[float], Sequence[float]]
+    ],
+) -> list[dict[str, object]]:
+    """Report every benchmark-to-benchmark distance in the plotted ranges."""
+    if len(samples) != len(normalized_histograms):
+        raise PlotError(
+            "pairwise shape validation requires one histogram pair per sample"
+        )
+    records: list[dict[str, object]] = []
+    for first_index, first_sample in enumerate(samples):
+        for second_index in range(first_index + 1, len(samples)):
+            second_sample = samples[second_index]
+            records.append(
+                {
+                    "run_name_a": first_sample.run_name,
+                    "run_name_b": second_sample.run_name,
+                    "observables": {
+                        name: total_variation_distance(
+                            normalized_histograms[first_index][observable_index],
+                            normalized_histograms[second_index][observable_index],
+                        )
+                        for observable_index, name in enumerate(
+                            ("m3h", "sum_pt_h")
+                        )
+                    },
+                }
+            )
+    return records
+
+
 def sample_label(
     ct3: Decimal, k3: Decimal, k4: Decimal, *, compact: bool = False
 ) -> str:
@@ -641,6 +674,9 @@ def plot_shapes(
         )
         for sample, event_shapes in zip(samples, shapes)
     ]
+    pairwise_validation_records = pairwise_total_variation_records(
+        samples, normalized_histograms
+    )
 
     validation_records = []
     for sample_index, (sample, event_shapes, normalized, absolute) in enumerate(
@@ -1022,6 +1058,9 @@ def plot_shapes(
                     "bin_width_gev": SHAPE_BIN_WIDTH_GEV,
                 },
                 "samples": validation_records,
+                "pairwise_shape_total_variation_in_plotted_range": (
+                    pairwise_validation_records
+                ),
             },
             indent=2,
         )

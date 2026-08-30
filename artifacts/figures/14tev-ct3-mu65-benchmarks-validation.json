@@ -132,26 +132,52 @@
       }
     },
     {
-      "run_name": "ct3_mu65_k3_p2p2_k4_p0_ct3_p2p2",
+      "run_name": "ct3_mu65_replacement_k3_p6p0_k4_p59_ct3_m0p50",
       "events": 100000,
       "manifest_events": 100000,
-      "total_event_weight": 332.59000000000003,
-      "cross_section_pb": 0.0033259,
+      "total_event_weight": 331.34000000000003,
+      "cross_section_pb": 0.0033134,
       "observables": {
         "m3h": {
-          "normalized_bin_sum": 0.6779799999993941,
-          "outside_range_fraction": 0.32202000000060593,
-          "absolute_bin_sum_pb": 0.0022548936819979854,
+          "normalized_bin_sum": 0.9799399999994655,
+          "outside_range_fraction": 0.02006000000053454,
+          "absolute_bin_sum_pb": 0.0032469331959982294,
           "maximum_closure_error_pb": 0.0,
-          "shape_total_variation_from_sm_in_plotted_range": 0.4089330381087339
+          "shape_total_variation_from_sm_in_plotted_range": 0.29070816052839255
         },
         "sum_pt_h": {
-          "normalized_bin_sum": 0.8403299999990529,
-          "outside_range_fraction": 0.1596700000009471,
-          "absolute_bin_sum_pb": 0.00279485354699685,
+          "normalized_bin_sum": 0.9957799999994627,
+          "outside_range_fraction": 0.0042200000005373495,
+          "absolute_bin_sum_pb": 0.0032994174519982195,
           "maximum_closure_error_pb": 0.0,
-          "shape_total_variation_from_sm_in_plotted_range": 0.40632947252231894
+          "shape_total_variation_from_sm_in_plotted_range": 0.25629811853977014
         }
+      }
+    }
+  ],
+  "pairwise_shape_total_variation_in_plotted_range": [
+    {
+      "run_name_a": "ct3_distribution14_pdf4lhc21_sm",
+      "run_name_b": "ct3_mu65_k3_p2p1_k4_p23_ct3_m2p3",
+      "observables": {
+        "m3h": 0.49251847081310457,
+        "sum_pt_h": 0.46845891571757
+      }
+    },
+    {
+      "run_name_a": "ct3_distribution14_pdf4lhc21_sm",
+      "run_name_b": "ct3_mu65_replacement_k3_p6p0_k4_p59_ct3_m0p50",
+      "observables": {
+        "m3h": 0.29070816052839255,
+        "sum_pt_h": 0.25629811853977014
+      }
+    },
+    {
+      "run_name_a": "ct3_mu65_k3_p2p1_k4_p23_ct3_m2p3",
+      "run_name_b": "ct3_mu65_replacement_k3_p6p0_k4_p59_ct3_m0p50",
+      "observables": {
+        "m3h": 0.7078445499222019,
+        "sum_pt_h": 0.6600302208132143
       }
     }
   ]

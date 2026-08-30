@@ -1,0 +1,13 @@
+# 14 TeV pilot points on the fitted mu_3h = 65 contour.
+# Couplings are rounded to two significant figures.  The points sample
+# different interference branches so that their normalized shapes can be
+# ranked against each other before any high-statistics production.
+name,k3,k4,ct3
+mu65_sep_k3_p6p0_k4_p39_ct3_p0p50,6.0,39,0.50
+mu65_sep_k3_p6p0_k4_p59_ct3_m0p50,6.0,59,-0.50
+mu65_sep_k3_p6p0_k4_m5p3_ct3_p2p0,6.0,-5.3,2.0
+mu65_sep_k3_p4p0_k4_m42_ct3_m0p50,4.0,-42,-0.50
+mu65_sep_k3_p3p0_k4_p43_ct3_p1p0,3.0,43,1.0
+mu65_sep_k3_p2p0_k4_p7p8_ct3_p2p0,2.0,7.8,2.0
+mu65_sep_k3_p0p0_k4_p46_ct3_p0p50,0.0,46,0.50
+mu65_sep_k3_m2p0_k4_p58_ct3_m2p0,-2.0,58,-2.0

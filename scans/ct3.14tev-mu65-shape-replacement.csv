@@ -1,0 +1,6 @@
+# 14 TeV replacement for the second Figure 9 benchmark.
+# The fitted signal strength is 64.802 and the independent 1k-event pilot
+# gives 65.017 relative to the matched SM sample.  All displayed nonzero
+# couplings are specified to two significant figures.
+name,k3,k4,ct3
+mu65_replacement_k3_p6p0_k4_p59_ct3_m0p50,6.0,59,-0.50
