@@ -4,7 +4,11 @@ Reviewed source: [`main_k3t_extended.tex`](main_k3t_extended.tex), including
 the inserted coefficients in
 [`ct3_rate_fit_coefficients.tex`](ct3_rate_fit_coefficients.tex).
 
-No changes have been made to the TeX sources as part of this review.
+The corrections identified below were implemented in
+`main_k3t_extended.tex` on 2 September 2026. The review is retained as an
+audit record, so its original line references describe the pre-correction
+source. The mixed $\kappa_{3t}$ benchmark discussion was also restored to the
+validated $\mu_{3h}\simeq65$ samples at the author's request.
 
 ## Language convention
 
