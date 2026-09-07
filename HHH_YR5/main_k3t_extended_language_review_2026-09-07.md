@@ -2,14 +2,16 @@
 
 Reviewed the abstract, main text, captions, and acknowledgements in
 [`main_k3t_extended.tex`](main_k3t_extended.tex), together with the redline.
-Line references below refer to the clean source after the acknowledgement
-addition. This is a follow-up to the earlier review, which remains a record
+Line references below refer to the clean source at the time of the review,
+after the acknowledgement addition. This is a follow-up to the earlier review, which remains a record
 of changes already implemented.
 
 The prose is generally clear and consistent with the paper's British-English
 conventions. The most useful remaining changes concern a caption inconsistency,
 one nested sentence, and the precision of comparisons and conclusions.
-The suggestions below have **not** been applied to the manuscript.
+All seven suggestions below were implemented in the clean and redline
+manuscripts on 7 September 2026. The review is retained as an audit record;
+its descriptions and proposed wording document the issues before correction.
 
 ## Applied: AP's acknowledgement
 
